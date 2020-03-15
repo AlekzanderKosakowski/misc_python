@@ -1,2 +1,2 @@
 # misc
-miscellaneous python code
+Coordinates.py: Convert between various coordinate formats (HH:MM:SS.ss vs Decimal Degrees)
