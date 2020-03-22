@@ -10,3 +10,5 @@ corner_dist.ipynb: Create fancy corner plot. Not very efficient.
 
 skyplot.py: Plot the locations of astronomical objects on a mollweide projection of the sky. Allows quick multi-color plotting based on optional 
 filter argument.
+
+plot_phased.py: Plot phased-lightcuve with model over two phases. Separate panel zoomed into phase=1.0 for eclipses.
