@@ -9,6 +9,8 @@ Coordinates.py: Convert between Right Ascension and Declination coordinate forma
 
 corner_dist.ipynb: Create fancy corner plot. Not very efficient.
 
+eleanor_astropy.py: Use eleanor to obtain TESS light curves. Process those lightcurves using astropy.timeseries.LombScargle. Estimate amplitude and frequency uncertainty using multi-processed bootstrapping
+
 plot_phased.py: Plot phased-lightcuve with model over two phases. Separate panel zoomed into phase=1.0 for eclipses.
 
 skyplot.py: Plot the locations of astronomical objects on a mollweide projection of the sky. Allows quick multi-color plotting based on optional 
