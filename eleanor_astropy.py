@@ -49,35 +49,34 @@ rc('font',**{'family':['DejaVu Sans']})
 rc('text', usetex=True)
 
 def get_lc(ra,dec):
-    # Collect data on target from each sector.
+    # Collect data on target from each sector in TESS.
+    # You may need to eleanor.Update(sector=##) to ensure you have all data.
     # tc (bool, optional) – If True, use a TessCut cutout to produce
     #   postcards rather than downloading the eleanor postcard data products.
-    # If tc=False (default) then sector 13 returns a singular matrix with
-    #   do_pca=True.
     global targetname
 
+    # https://adina.feinste.in/eleanor/api.html#eleanor.multi_sectors
     data = eleanor.multi_sectors('all',coords=(ra,dec),tc=True)
 
 
     # Extract LC data for each sector using PSF photometry
     mjd,flux,ferr = ([] for x in range(3))
     for k in data:
+        # https://adina.feinste.in/eleanor/api.html#eleanor.TargetData
         d = eleanor.TargetData(k, height=15, width=15, bkg_size=31,
                                do_psf=True, do_pca=True, crowded_field=True)
-        quality = d.quality  # Keep only quality = 0 data
-        index = np.where(quality == 0)
+        quality = d.quality
+        index = np.where(quality == 0) # Keep only quality = 0 data
 
         # Based on fits file headers, time is Barycentric Julian Date (-2457000 days)
         t = d.time[index]
-
         # corr_flux = Systematics-corrected version of lightcurve derived using aperture and tpf.
         f = d.corr_flux[index]
         # flux_err = Estimated uncertainty on raw_flux.
         e = d.flux_err[index]
 
-        # 'Append' all data for each sector together into a 1-D array
+        # 'Append' all data from all sectors together into a 1-D array
         mjd  = np.concatenate( (mjd, t) )
-        #flux = np.concatenate( (flux, f/np.median(f)) )
         flux = np.concatenate( (flux, f/np.median(f)) )
         ferr = np.concatenate( (ferr, e) )
 
@@ -85,6 +84,7 @@ def get_lc(ra,dec):
         del(d,t,f,e)
 
     # Save LC to file for easy access later.
+    # No reason to run eleanor everytime.
     lcname = str(targetname) + "_tess.txt"
     with open(lcname,'w') as ofile:
         for k in range(len(mjd)):
@@ -99,6 +99,9 @@ def get_ft(mjd,flux,ferr):
 
 
     # Perform three iterations of 3-sigma clipping
+    # May want to reduce this to 2-sigma clipping for targets without much
+    #   data unless you manually remove datapoints affected by pointing or
+    #   attitude adjustments.
     for k in range(3):
       index = np.where( (flux < 3*np.std(flux)+np.median(flux)) & (flux > -3*np.std(flux) + np.median(flux)) )
       mjd  = mjd[index]
@@ -172,14 +175,16 @@ def get_plot(mjd,flux,ferr,phase,freq_grid,power,peak_freq,mphase,model):
     ax1.scatter(mjd, flux, color="black", alpha=0.25,linestyle="None",marker=".",s=2)
     ax1.set_ylabel("Normalized Flux")
     ax1.set_xlabel("BJD ($-$2457000 days)")
+    #ax1.set_title("J0642$-$5605")
 
-    label = str(np.round(peak_freq,5)) + " cycles/day"
+    label = str(np.round(peak_freq,4)) + " cycles/day"
     ax2.plot(freq_grid,power,color="black", alpha=1.0,linewidth=1,label=label)
     #ax2.axhline(y=4*np.mean(power),xmin=0,xmax=1,color="crimson",linestyle="--",linewidth=1)
     #ax2.axhline(y=5*np.mean(power),xmin=0,xmax=1,color="crimson",linestyle="-",linewidth=1)
     ax2.set_ylabel("LS Power")
+    #ax2.set_ylim(0,0.005)
     ax2.set_xlabel("Frequency (cycles/day)")
-    if True:
+    if False:
         # Put a global flag here for optional inset plotting.
 
         # https://matplotlib.org/1.3.1/mpl_toolkits/axes_grid/users/overview.html#insetlocator
@@ -234,7 +239,7 @@ def run_apls(dataset):
 
 if __name__ == '__main__':
 
-    targetname = "0642m5605"
+    targetname = "0642m5605" # Used as filename prefixes
     ra0 = "06:42:07.99"
     dec0 = "-56:05:47.44"
     ra = float(RA2Decimal(ra0))
@@ -262,8 +267,8 @@ if __name__ == '__main__':
         result = pool.map(run_apls, datasets)
         result = np.array(result)
         np.savetxt('results.txt',result) # Save the output in a 2-column file: [freq, amplitude]
-        print(f"Amplitude: {amp} +- {np.std(result[:,0])}")
-        print(f"Frequency: {peak_freq} +- {np.std(result[:,1])}")
+        print(f"Amplitude: {np.median(result[:,0])}(-{abs(np.percentile(result[:,0],15.87)-np.median(result[:,0]))})(+{abs(np.percentile(result[:,0],84.13)-np.median(result[:,0]))})")
+        print(f"Frequency: {np.median(result[:,1])}(-{abs(np.percentile(result[:,1],15.87)-np.median(result[:,1]))})(+{abs(np.percentile(result[:,1],84.13)-np.median(result[:,1]))})")
 
     mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd0,flux0,ferr0)
     phase,mphase,model = get_phase(mjd,peak_freq,times,model)
