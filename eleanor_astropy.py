@@ -122,7 +122,7 @@ def get_ft(mjd,flux,ferr):
 
     t1 = np.min(mjd)
     t2 = np.max(mjd)
-    npts = (t2-t1)/(24.*60.*6000.) # Arbitrarily multiplied by 6000.
+    #npts = (t2-t1)/(24.*60.*6000.) # Arbitrarily multiplied by 6000.
     #times = np.arange(t1,t2,npts) # Previously used this, but it makes way too many data points.
     times = np.linspace(t1,t2,num=len(mjd)) # Using linspace and len(mjd) is much faster
 
@@ -260,7 +260,7 @@ if __name__ == '__main__':
     dec0 = "-56 05 47.44"
     ra = float(RA2Decimal(ra0))
     dec = float(Dec2Decimal(dec0))
-    print(ra,dec)
+    print(f"Checking target {targetname}: {ra} {dec}")
 
     if os.path.isfile(str(targetname) + "_tess.txt"):
         # Use _tess.txt file if it exists.
@@ -269,11 +269,11 @@ if __name__ == '__main__':
         # Use eleanor to get data if .txt file does not exist.
         mjd0,flux0,ferr0 = get_lc(ra,dec)
 
-    bootstrap = False # Estimate amplitude/frequency errors using bootstrapping?
+    bootstrap = True # Estimate amplitude/frequency errors using bootstrapping?
     if bootstrap:
         nboots = 10000 # 10,000 bootstrapped datasets
 
-        # Took like an hour to run 10000 bootstraps with 4 cores and 12500
+        # Took like 6 minutes to run 10000 bootstraps with 3 cores and 12500
         #   datapoints fitting one sine term.
         datasets = []
         for k in range(nboots):
