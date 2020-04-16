@@ -53,8 +53,6 @@ rc('text', usetex=True)
 def get_lc(ra,dec):
     # Collect data on target from each sector in TESS.
     # You may need to eleanor.Update(sector=##) to ensure you have all data.
-    # tc (bool, optional) – If True, use a TessCut cutout to produce
-    #   postcards rather than downloading the eleanor postcard data products.
     global targetname
 
     # https://adina.feinste.in/eleanor/api.html#eleanor.multi_sectors
@@ -95,15 +93,12 @@ def get_lc(ra,dec):
     return(mjd,flux,ferr)
 
 
-def get_ft(mjd,flux,ferr):
+def get_ft(mjd,flux,ferr,bootstrap,peak_freq):
     # Use astropy.timeseries.LombScargle to obtain LS periodogram
     # Creates periodogram and model.
 
 
     # Perform three iterations of 3-sigma clipping
-    # May want to reduce this to 2-sigma clipping for targets without much
-    #   data unless you manually remove datapoints affected by pointing or
-    #   attitude adjustments.
     for k in range(3):
       index = np.where( (flux < 3*np.std(flux)+np.median(flux)) & (flux > -3*np.std(flux) + np.median(flux)) )
       mjd  = mjd[index]
@@ -111,10 +106,9 @@ def get_ft(mjd,flux,ferr):
       ferr = ferr[index]
 
     # Define minimum and maximum period (in days) to search.
-    # Define step size for frequency grid.
     # It helps to know roughly what the period is already.
     minp = (60.)*(1./60.)*(1./24.)    # 60 minutes
-    maxp = (1440.)*(1./60.)*(1./24.) # 1 day
+    maxp = (1440.)*(1./60.)*(1./24.)  # 1 day
     stepsize = 0.0012342821877648902  # 1 minute stepsize
     stepsize /= 1.
 
@@ -122,17 +116,17 @@ def get_ft(mjd,flux,ferr):
 
     t1 = np.min(mjd)
     t2 = np.max(mjd)
-    #npts = (t2-t1)/(24.*60.*6000.) # Arbitrarily multiplied by 6000.
-    #times = np.arange(t1,t2,npts) # Previously used this, but it makes way too many data points.
-    times = np.linspace(t1,t2,num=len(mjd)) # Using linspace and len(mjd) is much faster
+    npts = max(len(mjd),10000) # Create at least 10,000 model points
+    times = np.linspace(t1,t2,num=npts)
 
     nterms = 1 # Number of sine-terms to use to find best-period.
-    #start = time.time()
     power = LombScargle(mjd,flux,dy=ferr,center_data=True,nterms=nterms).power(freq_grid) #https://docs.astropy.org/en/stable/api/astropy.timeseries.LombScargle.html#astropy.timeseries.LombScargle.power
-    peak_freq = freq_grid[np.where(power==np.max(power))][0]
+    if not bootstrap:
+        # If not bootstrapping, find highest peak.
+        # Else skip this and use the median peak from the bootstraps.
+        peak_freq = freq_grid[np.where(power==np.max(power))][0]
     model = LombScargle(mjd,flux,dy=ferr,center_data=True,nterms=nterms).model(times,peak_freq) # https://docs.astropy.org/en/stable/api/astropy.timeseries.LombScargle.html#astropy.timeseries.LombScargle.model
     amp = abs(np.median(model)-np.max(model))
-    #print(f"Peak Frequency ({nterms} terms): {np.round(peak_freq,8)} ; {np.round((time.time() - start)/60.,2)} minutes.")
 
     return(mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp)
 
@@ -140,17 +134,8 @@ def get_ft(mjd,flux,ferr):
 def get_phase(mjd,peak_freq,times,model):
     # Create phase points for data and model.
     # Sort the model points so it appears as a smooth line with ax.plt()
-    # Aside from eleanor finding/downloading/creating LC data, this
-    #   is by far the slowest part of the code.
-    # I believe I've fixed the issue:
-    # Previously created nearly 1 million model data points and sorted twice
-    #   that many.
-    # Now it simply uses np.linspace and creates 1 model point per data point,
-    #   but the model and data do not line up in time.
-
 
     # Assign phase to each flux point for phase-folded light curve.
-    # Uses best-fit frequency from astropy.timeseries.LombScargle
     phase = []
     for j in mjd:
         phase.append( (j-mjd[0])*peak_freq - int( (j-mjd[0])*peak_freq   ) )
@@ -247,7 +232,7 @@ def run_apls(dataset):
     # Each dataset was created in the function get_boots()
 
     mjd,flux,ferr = dataset
-    mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd,flux,ferr)
+    mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd,flux,ferr,False,1)
 
 
     return(peak_freq,amp)
@@ -269,7 +254,7 @@ if __name__ == '__main__':
         # Use eleanor to get data if .txt file does not exist.
         mjd0,flux0,ferr0 = get_lc(ra,dec)
 
-    bootstrap = True # Estimate amplitude/frequency errors using bootstrapping?
+    bootstrap = False # Estimate amplitude/frequency errors using bootstrapping?
     if bootstrap:
         nboots = 10000 # 10,000 bootstrapped datasets
 
@@ -288,20 +273,30 @@ if __name__ == '__main__':
         result = pool.map(run_apls, datasets)
         result = np.array(result)
         np.savetxt('results.txt',result) # Save the output in a 2-column file: [freq, amplitude]
-        print(f"Amplitude: {np.median(result[:,1])}(-{abs(np.percentile(result[:,1],15.87)-np.median(result[:,1]))})(+{abs(np.percentile(result[:,1],84.13)-np.median(result[:,1]))})")
-        print(f"Frequency: {np.median(result[:,0])}(-{abs(np.percentile(result[:,0],15.87)-np.median(result[:,0]))})(+{abs(np.percentile(result[:,0],84.13)-np.median(result[:,0]))})")
+        freqs, amps = result.T
 
-    # Run original dataset through astropy.LombScargle even after bootstrapping.
-    # This probably isn't necessary, but it's used to get information for the plot.
-    # Should throw this line into the 'if not bootstrap:' block and adjust
-    #   the run_apls() function to get the plot information.
-    # Maybe create another function that creates a specific model for the
-    #   median amplitude and frequency.
-    mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd0,flux0,ferr0)
+        # Perform three 3-sigma cuts to the bootstrap results to remove bad results.
+        for k in range(3):
+            sig = 3
+            freq1 = np.median(freqs) - sig*np.std(freqs)
+            freq2 = np.median(freqs) + sig*np.std(freqs)
+            amp1 = np.median(amps) - sig*np.std(amps)
+            amp2 = np.median(amps) + sig*np.std(amps)
+            index  = np.ravel(np.where((freqs >= freq1) & (freqs <= freq2)
+                                       & (amps >= amp1) & (amps <= amp2)))
+            freqs = freqs[index]
+            amps = amps[index]
+
+        print(f"Amplitude: {np.median(amps)}(-{abs(np.percentile(amps,15.87)-np.median(amps))})(+{abs(np.percentile(amps,84.13)-np.median(amps))})")
+        print(f"Frequency: {np.median(freqs)}(-{abs(np.percentile(freqs,15.87)-np.median(freqs))})(+{abs(np.percentile(freqs,84.13)-np.median(freqs))})")
+        mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd0,flux0,ferr0,True,np.median(freqs))
+        phase,mphase,model = get_phase(mjd,np.median(freqs),times,model)
+        get_plot(mjd,flux,ferr,phase,freq_grid,power,peak_freq,mphase,model)
+
 
     if not bootstrap:
+        mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd0,flux0,ferr0,False,1)
         print(f"Amplitude: {amp}")
         print(f"Frequency: {peak_freq}")
-
-    phase,mphase,model = get_phase(mjd,peak_freq,times,model)
-    get_plot(mjd,flux,ferr,phase,freq_grid,power,peak_freq,mphase,model)
+        phase,mphase,model = get_phase(mjd,peak_freq,times,model)
+        get_plot(mjd,flux,ferr,phase,freq_grid,power,peak_freq,mphase,model)
