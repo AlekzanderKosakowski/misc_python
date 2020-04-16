@@ -1,5 +1,5 @@
 '''
-Use eleanor to find data on target at (RA,Dec)
+Use eleanor to find TESS data on target at (RA,Dec)
 Uses astropy.timeseries.LombScargle to obtain peak frequency
 Saves light-curve file as 3-column .txt
 Plots LC, LS-Diagram, and Phase-folded LC on a single plot
@@ -36,6 +36,8 @@ I notice this error after connection timeout during sector data downloads.
 
 # pip3 install eleanor
 # pip3 install --user eleanor
+# pip3 install astropy
+# pip3 install --user astropy
 import eleanor # https://adina.feinste.in/eleanor/index.html
 import numpy as np
 from Coordinates import RA2Decimal,Dec2Decimal # https://github.com/AlekzanderKosakowski/misc_python/blob/master/Coordinates.py
@@ -110,8 +112,9 @@ def get_ft(mjd,flux,ferr):
 
     # Define minimum and maximum period (in days) to search.
     # Define step size for frequency grid.
-    minp = (60.)*(1./60.)*(1./24.)
-    maxp = (1440.)*(1./60.)*(1./24.)
+    # It helps to know roughly what the period is already.
+    minp = (60.)*(1./60.)*(1./24.)    # 60 minutes
+    maxp = (1440.)*(1./60.)*(1./24.) # 1 day
     stepsize = 0.0012342821877648902  # 1 minute stepsize
     stepsize /= 1.
 
@@ -119,15 +122,15 @@ def get_ft(mjd,flux,ferr):
 
     t1 = np.min(mjd)
     t2 = np.max(mjd)
-    npts = (t2-t1)/(24*60*6000)
+    npts = (t2-t1)/(24.*60.*6000.) # Arbitrarily multiplied by 6000.
     times = np.arange(t1,t2,npts)
     nterms = 1 # Number of sine-terms to use to find best-period.
     #start = time.time()
-    power = LombScargle(mjd,flux,dy=ferr,center_data=True,nterms=nterms).power(freq_grid)
+    power = LombScargle(mjd,flux,dy=ferr,center_data=True,nterms=nterms).power(freq_grid) #https://docs.astropy.org/en/stable/api/astropy.timeseries.LombScargle.html#astropy.timeseries.LombScargle.power
     peak_freq = freq_grid[np.where(power==np.max(power))][0]
-    model = LombScargle(mjd,flux,dy=ferr,center_data=True,nterms=1).model(times,peak_freq)
+    model = LombScargle(mjd,flux,dy=ferr,center_data=True,nterms=nterms).model(times,peak_freq) # https://docs.astropy.org/en/stable/api/astropy.timeseries.LombScargle.html#astropy.timeseries.LombScargle.model
     amp = abs(np.median(model)-np.max(model))
-    #print(f"Peak Frequency ({nterms} terms): {np.round(peak_freq,8)} ; {np.round((time.time() - start)/60.,3)} minutes.")
+    #print(f"Peak Frequency ({nterms} terms): {np.round(peak_freq,8)} ; {np.round((time.time() - start)/60.,2)} minutes.")
 
     return(mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp)
 
@@ -182,9 +185,14 @@ def get_plot(mjd,flux,ferr,phase,freq_grid,power,peak_freq,mphase,model):
     #ax2.axhline(y=4*np.mean(power),xmin=0,xmax=1,color="crimson",linestyle="--",linewidth=1)
     #ax2.axhline(y=5*np.mean(power),xmin=0,xmax=1,color="crimson",linestyle="-",linewidth=1)
     ax2.set_ylabel("LS Power")
-    #ax2.set_ylim(0,0.005)
     ax2.set_xlabel("Frequency (cycles/day)")
     if False:
+        # Adds a zoomed inset plot to the data.
+        # Right now this is hard-coded to look nice on a specific frequency
+        #   range for a published figure:
+        #   https://ui.adsabs.harvard.edu/abs/2020arXiv200404202K/abstract
+        # This will almost certainly look bad with any other range.
+
         # Put a global flag here for optional inset plotting.
 
         # https://matplotlib.org/1.3.1/mpl_toolkits/axes_grid/users/overview.html#insetlocator
@@ -207,15 +215,14 @@ def get_plot(mjd,flux,ferr,phase,freq_grid,power,peak_freq,mphase,model):
     ax3.plot(mphase,model,color='red',alpha=1.0,linewidth=1)
     ax3.set_ylabel("Normalized Flux")
     ax3.set_xlabel("Phase")
-    #ax3.set_ylim((0.995,1.005))
-    #plt.suptitle(targetname)
+    #plt.suptitle(targetname)  # ax1.set_title() looks better
     figname = str(targetname) + "_tess.pdf"
     plt.savefig(figname,dpi=500)
 
 def get_boots(mjd,flux,ferr):
     # Create bootstrapped datasets for error estimation.
     # Use numpy.random.randint to randomly choose N points (with replacement)
-    #   from the original data.
+    #   from the original dataset of length N.
     # This is used because I don't know how to get a covariance matrix for
     #   uncertainties in amplitude and frequency from astropy...
 
@@ -234,6 +241,7 @@ def run_apls(dataset):
     mjd,flux,ferr = dataset
     mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd,flux,ferr)
 
+
     return(peak_freq,amp)
 
 
@@ -241,21 +249,26 @@ if __name__ == '__main__':
 
     targetname = "0642m5605" # Used as filename prefixes
     ra0 = "06:42:07.99"
-    dec0 = "-56:05:47.44"
+    dec0 = "-56 05 47.44"
     ra = float(RA2Decimal(ra0))
     dec = float(Dec2Decimal(dec0))
     print(ra,dec)
 
     if os.path.isfile(str(targetname) + "_tess.txt"):
+        # Use _tess.txt file if it exists.
         mjd0,flux0,ferr0 = np.loadtxt(str(targetname) + "_tess.txt",unpack=True,dtype=np.float64)
     else:
+        # Use eleanor to get data if .txt file does not exist.
         mjd0,flux0,ferr0 = get_lc(ra,dec)
 
     bootstrap = False # Estimate amplitude/frequency errors using bootstrapping?
     if bootstrap:
-        # Took like an hour to run 10000 bootstraps with 4 cores and 12k datapoints
+        nboots = 10000 # 10,000 bootstrapped datasets
+
+        # Took like an hour to run 10000 bootstraps with 4 cores and 12500
+        #   datapoints fitting one sine term.
         datasets = []
-        for k in range(10000): # 10,000 bootstrapped datasets
+        for k in range(nboots):
             mjd  = np.copy(mjd0)
             flux = np.copy(flux0)
             ferr = np.copy(ferr0)
@@ -267,9 +280,20 @@ if __name__ == '__main__':
         result = pool.map(run_apls, datasets)
         result = np.array(result)
         np.savetxt('results.txt',result) # Save the output in a 2-column file: [freq, amplitude]
-        print(f"Amplitude: {np.median(result[:,0])}(-{abs(np.percentile(result[:,0],15.87)-np.median(result[:,0]))})(+{abs(np.percentile(result[:,0],84.13)-np.median(result[:,0]))})")
-        print(f"Frequency: {np.median(result[:,1])}(-{abs(np.percentile(result[:,1],15.87)-np.median(result[:,1]))})(+{abs(np.percentile(result[:,1],84.13)-np.median(result[:,1]))})")
+        print(f"Amplitude: {np.median(result[:,1])}(-{abs(np.percentile(result[:,1],15.87)-np.median(result[:,1]))})(+{abs(np.percentile(result[:,1],84.13)-np.median(result[:,1]))})")
+        print(f"Frequency: {np.median(result[:,0])}(-{abs(np.percentile(result[:,0],15.87)-np.median(result[:,0]))})(+{abs(np.percentile(result[:,0],84.13)-np.median(result[:,0]))})")
 
+    # Run original dataset through astropy.LombScargle even after bootstrapping.
+    # This probably isn't necessary, but it's used to get information for the plot.
+    # Should throw this line into the 'if not bootstrap:' block and adjust
+    #   the run_apls() function to get the plot information.
+    # Maybe create another function that creates a specific model for the
+    #   median amplitude and frequency.
     mjd,flux,ferr,freq_grid,power,peak_freq,times,model,amp = get_ft(mjd0,flux0,ferr0)
+
+    if not bootstrap:
+        print(f"Amplitude: {amp}")
+        print(f"Frequency: {peak_freq}")
+
     phase,mphase,model = get_phase(mjd,peak_freq,times,model)
     get_plot(mjd,flux,ferr,phase,freq_grid,power,peak_freq,mphase,model)
