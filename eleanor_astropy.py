@@ -123,7 +123,9 @@ def get_ft(mjd,flux,ferr):
     t1 = np.min(mjd)
     t2 = np.max(mjd)
     npts = (t2-t1)/(24.*60.*6000.) # Arbitrarily multiplied by 6000.
-    times = np.arange(t1,t2,npts)
+    #times = np.arange(t1,t2,npts) # Previously used this, but it makes way too many data points.
+    times = np.linspace(t1,t2,num=len(mjd)) # Using linspace and len(mjd) is much faster
+
     nterms = 1 # Number of sine-terms to use to find best-period.
     #start = time.time()
     power = LombScargle(mjd,flux,dy=ferr,center_data=True,nterms=nterms).power(freq_grid) #https://docs.astropy.org/en/stable/api/astropy.timeseries.LombScargle.html#astropy.timeseries.LombScargle.power
@@ -140,6 +142,12 @@ def get_phase(mjd,peak_freq,times,model):
     # Sort the model points so it appears as a smooth line with ax.plt()
     # Aside from eleanor finding/downloading/creating LC data, this
     #   is by far the slowest part of the code.
+    # I believe I've fixed the issue:
+    # Previously created nearly 1 million model data points and sorted twice
+    #   that many.
+    # Now it simply uses np.linspace and creates 1 model point per data point,
+    #   but the model and data do not line up in time.
+
 
     # Assign phase to each flux point for phase-folded light curve.
     # Uses best-fit frequency from astropy.timeseries.LombScargle
