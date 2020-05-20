@@ -23,6 +23,9 @@ def binned(input,b):
     # Return same format as input.
     if s[0] < s[1]:
 
+        # Sort input by first column (phase)
+        input = np.array(sorted(input.T,key=lambda x: x[0])).T
+
         x,y  = input[0],input[1]
         xbin = [np.mean(x) for x in list(chunked(x,b))]
         ybin = [np.mean(y) for y in list(chunked(y,b))]
@@ -39,7 +42,9 @@ def binned(input,b):
         input = input.T
 
         # Do the same stuff as above.
-        x,y = input[0],input[1]
+        input = np.array(sorted(input.T,key=lambda x: x[0])).T
+
+        x,y  = input[0],input[1]
         xbin = [np.mean(x) for x in list(chunked(x,b))]
         ybin = [np.mean(y) for y in list(chunked(y,b))]
         if input.shape[0] == 3:
