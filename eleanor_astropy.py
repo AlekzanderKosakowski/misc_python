@@ -109,10 +109,11 @@ def get_ft(mjd,flux,ferr,bootstrap,peak_freq):
     # It helps to know roughly what the period is already.
     minp = (60.)*(1./60.)*(1./24.)    # 60 minutes
     maxp = (1440.)*(1./60.)*(1./24.)  # 1 day
-    stepsize = 0.0012342821877648902  # 1 minute stepsize
+    stepsize = 1./60./24.  # 1 minute stepsize
     stepsize /= 1.
 
-    freq_grid = np.arange(1/maxp,1/minp,stepsize)
+    pgrid = np.arange(maxp,minp,stepsize) # Evenly spaced period grid
+    freq_grd = 1/pgrid                    # Evenly spaced frequency grid
 
     t1 = np.min(mjd)
     t2 = np.max(mjd)
