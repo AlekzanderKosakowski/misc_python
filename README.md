@@ -2,6 +2,8 @@
 
 binning.py: Average-bin light curve data. Accepts [time,mag,merr], [time,mag], and their transpose formats.
 
+cal_lc.py: Create a calibration light curve and apply it to your photometry obtained from IRAF's PHOT or DAOPHOT tasks.
+
 convert_wavelength.py: Convert wavelength values between their vacuum and air values. Requires Angstrom input units.
                        (Source: https://www.astro.uu.se/valdwiki/Air-to-vacuum%20conversion )
 
