@@ -22,7 +22,7 @@
 #   phot_file_example2.txt
 #   phot_file_example3.txt
 #
-#     Example3 shows strong ellipsoidal variations.
+#     Example3 shows strong sinusoidal variations.
 #     This effect is overfit if you fit the calibration LC with order=2 or 3
 #     I recommend using order=1 when running this code on example3
 #     'order' is used in the flatten_lc() function
@@ -142,7 +142,7 @@ def apply_cal_lc(lightcurves, cal_lc):
 
 def flatten_lc(clightcurves, order, limiting_merr):
 
-    # Detrends each light curve by fitting and subtracting a 3rd-order
+    # Detrends each light curve by fitting and subtracting a Nth-order
     #   polynomial using numpy.polyfit.
     #
     # numpy.polyfit does not like numbers to be very large, such as HJD
