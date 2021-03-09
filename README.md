@@ -13,6 +13,8 @@ corner_dist.ipynb: Create fancy corner plot. Not very efficient, doesn't look go
 
 eleanor_astropy.py: Use eleanor (https://adina.feinste.in/eleanor/) to obtain TESS FFI light curves. Process those lightcurves using astropy.timeseries.LombScargle to search for variability. Estimate amplitude and frequency uncertainty using multi-processed bootstrapping. While it is very easy to modify this code to take a list of targets instead of a single target, I don't recommend it because the code isn't written in a memory efficient way. This code doesn't appear to release memory after each loop, causing it to quickly hoard all of your available memory. It was much slower, but more memory efficient, to modify this code to use sys.argv[] for targetdec, ra, dec and throw it in a bash loop or awk-generated script instead.
 
+lm_fitspec: Use Levenberg-Marquardt method to fit model DA white dwarf atmosphere spectra to observed spectra. The model spectra are not public and not available on request.
+
 plot_phased.py: Plot phased-lightcuve with model over two phases. Separate panels zoomed into phase=0.5 and phase=1.0 for secondary and primary eclipses.
 
 skyplot.py: Plot the locations of astronomical objects on a mollweide projection of the sky. Allows quick multi-color plotting based on optional filter argument.

@@ -440,10 +440,13 @@ def get_rms(y, m):
 def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j):
     #
     # Create the final plot of stacked Balmer lines and their fits
+    # Currently uses the minimum flux value in each wavelength range as the "center" of the line.
+    # This is obviously not correct in all cases, especially noisy spectra.
+    # I'll fix this later to fit some function (Gaussian?) to each line to determine central wavelength. The double/triple gaussian functions are already there, so it should just be a curve_fit() line and done.
     #
     global H_lines
 
-    colors = ['darkblue', 'crimson']
+    colors = ['crimson', 'crimson']
 
     nshift = 0
     for k,v in H_lines.items():
