@@ -490,10 +490,10 @@ if __name__ == "__main__":
     xt, yt, include_i, shift = split_data(x, y, include)
 
     # Load all of the model files at once. Save an array of gravities and temperatures as well.
+    # If running this code on a sequence of fits files, then put this line in an if-statement to only run on the first pass. Otherwise you'll ned up reloading the same models every loop.
     mgravs, mteffs, mwavelength, mflux = load_models(convolution, model_path)
 
     # Create a list of models using the observed wavelength grid.
-    # This is the point where you'd throw in a for loop if you were running this code on a list of files in sequence.
     model_list = interp_models(x, mgravs, mteffs, mwavelength, mflux)
 
     # For each wavelength point, create the 'cubic' spline interpolation function using all models.
