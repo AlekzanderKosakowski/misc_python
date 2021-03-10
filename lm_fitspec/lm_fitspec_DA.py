@@ -195,10 +195,9 @@ def get_ignore_indices(xt, block_calcium3933, block_helium4026):
     ignore_indices = np.concatenate((calcium_index, helium_index))
     return(ignore_indices)
 
-def load_models(convolution, model_path, x):
+def load_models(convolution, model_path):
     #
     # Load the collection of model spectra
-    # Only keep model data within 3 data points of the observed wavelengths.
     # This function depends entirely on the format of the model spectra.
     #   Therefore, this function will likely need to be entirely rewritten for different model file formats.
     #   This code is based on model files with the following format:
@@ -226,42 +225,47 @@ def load_models(convolution, model_path, x):
     for i,file in enumerate(model_files):
         mfilename = f"{model_path}/{file}"
         with open(mfilename, 'r') as mfile:
-          # print(f"Loading model file {mfilename}")
-          mgravs[i] = np.log10(float(mfile.readline().split()[1]))
-          if i == 0:
-              mteffs = np.array(mfile.readline().split()[1:], dtype=np.float64)
+            # print(f"Loading model file {mfilename}")
+            mgravs[i] = np.log10(float(mfile.readline().split()[1]))
+            if i == 0:
+                mteffs = np.array(mfile.readline().split()[1:], dtype=np.float64)
 
-          temp_mdata = np.loadtxt(mfilename, unpack=True, skiprows=1, dtype=str)
+            temp_mdata = np.loadtxt(mfilename, unpack=True, skiprows=1, dtype=str)
 
-          mwavelength = np.array(temp_mdata[0][1:], dtype=np.float64)
-          index = np.where((mwavelength >= x[0]) & (mwavelength <= x[-1]))[0]
-          index = range(index[0]-3,index[-1]+3)
-          mwavelength = mwavelength[index]
+            mwavelength = np.array(temp_mdata[0][1:], dtype=np.float64)
 
-          # Get flux values from a single log(g) file for all temperatures.
-          # Correct typos generated from fortran formatting (1.234-100 is corrected to 1.234E-100).
-          temp_mflux = np.array(temp_mdata[1:].T[1:].T)
-          mflux = np.zeros_like(temp_mflux)
-          for t in range(len(temp_mflux)):
-            mflux[t] = np.array([k if 'E' in k else k[:-4] + 'E' + k[-4:] for k in temp_mflux[t]])
-          mflux = np.array(mflux, dtype=np.float64)[:,index]
-
-          if i == 0: # On the first model file being read in, initialize the model_list array
-              # Build model array of shape [ngrav, ntemp, nflux]
-              model_list = np.zeros((len(mgravs), len(mteffs), len(x)))
-
-          for k in range(len(mflux)):
-              # Interpolate over model wavelengths and flux to the observed wavelength grid.
-              # Using linear interpolation for now.
-              # The model files have a duplicate wavelength point that prevents the use of 'cubic' interpolation. Probably not terribly important.
-              z = [interp1d(mwavelength, l, kind='linear') for l in mflux]
-
-              # Interpolate to the observed wavelength range now.
-              model_list[i,k] = z[k](x)
+            # Get flux values from a single log(g) file for all temperatures.
+            # Correct typos generated from fortran formatting (1.234-100 is corrected to 1.234E-100).
+            temp_mflux = np.array(temp_mdata[1:].T[1:].T)
+            if i == 0:
+                mflux = np.zeros( (len(mgravs), len(temp_mflux), len(temp_mflux[0])) )
+            for t in range(len(temp_mflux)):
+                mflux[i][t] = np.array([k if 'E' in k else k[:-4] + 'E' + k[-4:] for k in temp_mflux[t]])
+            mflux = np.array(mflux, dtype=np.float64)
 
     mgravs = np.array(mgravs, dtype=np.float64)
 
-    return(mgravs, mteffs, model_list)
+    return(mgravs, mteffs, mwavelength, mflux)
+
+def interp_models(x, mgravs, mteffs, mwavelength, mflux):
+    #
+    # Interpolate the models to the observed wavelength grid.
+    # This is separate from the load_model() function to allow for multiple-targets to be run in sequence without having to reload all models every time.
+    # This is because different targets will have a slightly different observed wavelength grid, so the load_model() function should be independent of the observed wavelength grid.
+    #
+    for i in range(len(mgravs)):
+        if i == 0: # Initialize the model_list array
+            # Build model array of shape [ngrav, ntemp, nflux_obs]
+            model_list = np.zeros((len(mgravs), len(mteffs), len(x)))
+
+        for k in range(len(mflux[i])):
+            # Using linear interpolation for now to create an interpolation object over wavelength and flux for all models.
+            # The model files have a duplicate wavelength point that prevents the use of 'cubic' interpolation. Probably not terribly important.
+            z = [interp1d(mwavelength, l, kind='linear') for l in mflux[i]]
+
+            model_list[i,k] = z[k](x)
+
+    return(model_list)
 
 def split_model(x, y, include, dmdq):
     #
@@ -464,7 +468,7 @@ def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift):
 
 if __name__ == "__main__":
 
-    filename = "fits_files/20180309_0848p0237_0100.ms.fits" # FITS file of the spectrum to fit
+    filename = "fits_files/20170323_1012p1427_0096.ms.fits" # FITS file of the spectrum to fit
 
     model_path = '/Users/kastra/code/python/fitspec/python_grids_ELM/' # System location of the model files.
     convolution = 2.3 # Spectral resolution of the data.
@@ -494,9 +498,12 @@ if __name__ == "__main__":
     x, y, e, target = load_fitsdata(filename)
     xt, yt, include_i, shift = split_data(x, y, include)
 
-
     # Load all of the model files at once. Save an array of gravities and temperatures as well.
-    mgravs, mteffs, model_list = load_models(convolution, model_path, x)
+    mgravs, mteffs, mwavelength, mflux = load_models(convolution, model_path)
+
+    # Create a list of models using the observed wavelength grid.
+    # This is the point where you'd throw in a for loop if you were running this code on a list of files in sequence.
+    model_list = interp_models(x, mgravs, mteffs, mwavelength, mflux)
 
     # For each wavelength point, create the 'cubic' spline interpolation function using all models.
     # See "Numerical Recipes in C++ Second Edition" chapters 3 for details on Cubic Spline interpolation
