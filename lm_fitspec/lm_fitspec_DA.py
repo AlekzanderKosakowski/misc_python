@@ -102,7 +102,7 @@ def split_data(x, y, include):
 
     print(f"\nShifted observed wavelength values by {shift} A based on a multi-Gaussian fit to a few line centers.")
 
-    return(xt, yt, np.array(include_i))
+    return(xt, yt, np.array(include_i), shift)
 
 def find_line_center(x, y, i, line, shifts):
     #
@@ -437,27 +437,25 @@ def get_rms(y, m):
 
     return(e)
 
-def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j):
+def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift):
     #
     # Create the final plot of stacked Balmer lines and their fits
-    # Currently uses the minimum flux value in each wavelength range as the "center" of the line.
-    # This is obviously not correct in all cases, especially noisy spectra.
-    # I'll fix this later to fit some function (Gaussian?) to each line to determine central wavelength. The double/triple gaussian functions are already there, so it should just be a curve_fit() line and done.
+    # To center each line, the code subtracts the air-wavelength line center for each line calculated from the Rydberg equation.
+    #   See equation 2-113 of Astrophysical Formulae Second Corrected and Enlarged edition (Kenneth R. Lang)
+    # Vacuum-wavelength line centers were corrected to air-wavelength using the equations from the website: "https://www.astro.uu.se/valdwiki/Air-to-vacuum%20conversion" which uses equations from various publications.
     #
     global H_lines
 
     colors = ['crimson', 'crimson']
 
-    nshift = 0
+    vshift = 0
     for k,v in H_lines.items():
-        index = np.ravel(np.where( (x>=v[0]) & (x<=v[-1]) ))
+        index = np.ravel(np.where( (x>=v[0]) & (x<=v[1]) ))
         if len(index) == 0:
             continue
-        min_index = np.ravel(np.where(  (y==np.min(y[index])) & (x>=v[0]) & (x<=v[-1])  ))
-        minx = x[min_index]
-        ax[j].plot(x[index]-minx, y[index]+nshift, color='black', linewidth=1)
-        ax[j].plot(x[index]-minx, m[index]+nshift, color=colors[j], linewidth=1)
-        nshift += 0.5
+        ax[j].plot(x[index]-(v[2]+shift), y[index]+vshift, color='black', linewidth=1)
+        ax[j].plot(x[index]-(v[2]+shift), m[index]+vshift, color=colors[j], linewidth=1)
+        vshift += 0.5
 
     ax[j].set_xlabel("$\Delta\lambda$ ($\AA$)")
     ax[j].set_xticks([-100, -50, 0, 50, 100])
@@ -475,26 +473,26 @@ if __name__ == "__main__":
     ignore_calcium3933 = True   # Deweight the Ca II absorption at 3933 angstrom?  True/False
     ignore_helium4026  = False  # Deweight the He I absorption at 4026 angstrom?   True/False
 
-    # Wavelength range for each Hydrogen line.
-    H_lines = {"halpha":   [6361., 6763.],
-               "hbeta":    [4721., 5001.],
-               "hgamma":   [4220., 4460.],
-               "hdelta":   [4031., 4171.],
-               "hepsilon": [3925., 4015.],
-               "h8":       [3859., 3919.],
-               "h9":       [3815., 3855.],
-               "h10":      [3782., 3812.],
-               "h11":      [3760., 3780.],
-               "h12":      [3741., 3759.]}
+    # Wavelength range for each Hydrogen line. Line centers (in air) from Rydberg formula given as element [2] of array
+    H_lines = {"halpha":   [6361., 6763., 6562.8821],
+               "hbeta":    [4721., 5001., 4861.3791],
+               "hgamma":   [4220., 4460., 4340.5092],
+               "hdelta":   [4031., 4171., 4101.7768],
+               "hepsilon": [3925., 4015., 3970.1121],
+               "h8":       [3859., 3919., 3889.0876],
+               "h9":       [3815., 3855., 3835.4220],
+               "h10":      [3782., 3812., 3797.9350],
+               "h11":      [3760., 3780., 3770.6671],
+               "h12":      [3741., 3759., 3750.1883]}
     # Create a np.array version of the H_lines dictionary since njit doesn't allow dictionaries.
-    njit_H_lines = np.zeros((len(H_lines),2))
+    njit_H_lines = np.zeros((len(H_lines),3))
     for i,k in enumerate(H_lines):
         njit_H_lines[i] = H_lines[k]
 
 
     # Load the data and trim it to the regions around the 'include' Balmer lines. Fit and apply a wavelength shift correction from radial velocity
     x, y, e, target = load_fitsdata(filename)
-    xt, yt, include_i = split_data(x, y, include)
+    xt, yt, include_i, shift = split_data(x, y, include)
 
 
     # Load all of the model files at once. Save an array of gravities and temperatures as well.
@@ -589,7 +587,8 @@ if __name__ == "__main__":
         eteff, elogg = covar[0][0]**0.5, covar[1][1]**0.5
         print(f'\nFinal Solution:\n{"Teff":>6s} = {teff:>5.0f} +/- {eteff:>5.0f}\n{"log(g)":>6s} = {logg:>5.3f} +/- {elogg:>5.3f}\n{"chi2":>6s} = {chi2:>5.3f}\n')
 
-        plot_solution(xt, yt, mt, teff, eteff, logg, elogg, ax, j)
+        plot_solution(xt, yt, mt, teff, eteff, logg, elogg, ax, j, shift)
 
     # plt.suptitle(f'{filename}')
-    plt.savefig(f"{target}.png")
+    plt.show()
+    # plt.savefig(f"{target}.png")
