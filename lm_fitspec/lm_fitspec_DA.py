@@ -31,12 +31,12 @@ def load_fitsdata(filename):
     #     You'll need to change "fitsfile[hdu].data" to "fitsfile[hdu].data[0][0]" or something similar
     #
     #   x = np.array of observed wavelength data
-    #   y = np.array of observed spectral data
-    #   e = np.array of observed errorbars. Errorbars not actually present in spectra. Just set all to 1 for equal weighting.
+    #   y = np.array of observed spectral data. Split into y_lambda for F-lambda units and F-nu for F-nu units.
+    #   e = np.array of observed errorbars. Errorbars not actually present in spectra. Just set all to 1 for equal weighting
     #
     hdu = 0
     fitsfile = fits.open(filename)
-    y_lambda = np.array(fitsfile[hdu].data[0][0], dtype=np.float64)
+    y_lambda = np.array(fitsfile[hdu].data, dtype=np.float64)
 
     # print(fitsfile.info()) ; sys.exit()
 
@@ -49,7 +49,7 @@ def load_fitsdata(filename):
     # Weight each point equally.
     e = np.ones_like(y_nu)
 
-    target = fitsfile[hdu].header['OBJECT']
+    target = fitsfile[hdu].header['OBJECT'] # Generally, the "OBJECT" header keyword is the name of the object that the telescope observer typed into the telescope software when observing
 
     return(x, y_nu, e, target)
 
@@ -85,8 +85,8 @@ def split_data(x, y, include):
             include_i.append(i)
         i += 1
 
-    fit_shifts = ['halpha', 'hbeta', 'hgamma', 'hdelta']                    # Use only these lines for velocity fitting
-    shifts = np.zeros(np.count_nonzero([k in fit_shifts for k in include])) # Wavelength shifts per line. Will median later and apply a uniform shift
+    fit_shifts = ['halpha', 'hbeta', 'hgamma', 'hdelta']                    # Use only these lines for Gaussian line-center fitting.
+    shifts = np.zeros(np.count_nonzero([k in fit_shifts for k in include])) # Fitted wavelength shift per line. Will median later and apply a uniform shift to all of the observed data
 
     for l in range(2):                  # Two passes: Once to determine wavelength shift, then once again after the shift is applied. Required to do this at least twice or the models may end up with different dimensions than the data.
         shift = np.median(shifts)       # shift=0 for the first pass.
@@ -118,36 +118,24 @@ def find_line_center(x, y, i, line, shifts):
     #     amp2 = 0.25  (25% absorption depth)
     #     amp3 = 0.125 (12.5% absorption depth)
     #
-    # From Wikipedia "Balmer Series"
-    H_center_air   = {"halpha":    6562.79,
-                      "hbeta":     4861.35,
-                      "hgamma":   4340.472,
-                      "hdelta":   4101.734,
-                      "hepsilon": 3970.075}
-
-    # Using equations from [http://www.astro.uu.se/valdwiki/Air-to-vacuum%20conversion] to convert from air to vacuum
-    H_center_vac   = {"halpha":   6564.602977311409,
-                      "hbeta":       4862.708025294,
-                      "hgamma":   4341.692323417887,
-                      "hdelta":   4102.891633248132,
-                      "hepsilon": 3971.198206170563}
+    global H_lines
 
     try:
         # Try to fit a sum of three Gaussians to get line centers values.
         popt, pcov = curve_fit(gauss3, x, y, p0=[np.median(x), 0.5, (x[-1]-x[0])/8, 0.25, (x[-1]-x[0])/4, 0.125, (x[-1]-x[0])/2])
         model = gauss3(x, *popt)
     except:
-        # If three Gaussians fails, do two instead.
+        # If three Gaussians fails, try two instead. If two fails then maybe consider not fitting lines beyond even Hgamma since they may be too noisy
         popt, pcov = curve_fit(gauss2, x, y, p0=[np.median(x), 0.5, (x[-1]-x[0])/8, 0.25, (x[-1]-x[0])/4])
         model = gauss2(x, *popt)
 
 
-    # Plot each line being fit to check how well it performs.
+    # Plot each line being fit to check how well it performs. Uncomment to check what the fits to each line look like.
     # plt.plot(x,y)
     # plt.plot(x,model)
     # plt.show()
 
-    shifts[i] = (popt[0] - H_center_air[line])
+    shifts[i] = (popt[0] - H_lines[line][2])
     return(shifts)
 
 def gauss3(x, mu, a1, sig1, a2, sig2, a3, sig3):
@@ -178,7 +166,7 @@ def gauss2(x, mu, a1, sig1, a2, sig2):
 
 def get_ignore_indices(xt, block_calcium3933, block_helium4026):
     #
-    # Use np.where() to determine indices in the data where known absorption lines may be present.
+    # Use np.where() to determine indices in the data where known metal absorption lines may be present.
     # If the user specified to ignore specific lines, then assign "error-bars" of 1e30 to essentially force the fit to ignore those data points.
     # Eventually add 'auto' as an option to block_calcium3933 and other lines to try to fit a feature at these locations.
     #   If the feature successfully fits, then deweight those points, if not then don't deweight.
@@ -214,10 +202,7 @@ def load_models(convolution, model_path):
     #   mwavelength: Wavelength grid used in the model files.
     #    temp_mflux: temporary array of STRINGS holding the collection of all fluxes for a single model file (one log(g), all Teff)
     #                Includes typos generated from the original fortran formatting (1.234-100 should be 1.234E-100).
-    #         mflux: Corrected array of np.float64 containing all fluxes for a single model file
-    #    model_list: Array containing all flux data for all model files.
-    #                Has the format: [log(g), Teff, wavelength]
-    #                For example: if you wanted the entire 1D spectrum for a specific model, you'd use "model_list[12][15]" and use mwavelengths as your x-values
+    #         mflux: Corrected array of np.float64 containing all fluxes for all models
     #
     model_files = sorted([k for k in os.listdir(model_path) if f"ML1.8_c{convolution}" in k]) # You will need to change the "ML1.8_c" part if you are using different models.
 
@@ -252,6 +237,11 @@ def interp_models(x, mgravs, mteffs, mwavelength, mflux):
     # Interpolate the models to the observed wavelength grid.
     # This is separate from the load_model() function to allow for multiple-targets to be run in sequence without having to reload all models every time.
     # This is because different targets will have a slightly different observed wavelength grid, so the load_model() function should be independent of the observed wavelength grid.
+    #
+    #    model_list: Array containing all flux data for all model files.
+    #                Has the format: [log(g), Teff, wavelength]
+    #                For example: if you wanted the entire 1D spectrum for a specific model, you'd use "model_list[12][15]" for your fluxes and use the observed wavelengths "x" as your x-values
+    #             z: list of interpolation objects to interpolate over wavelength. Each element in this list is the interpolation object for a different temperature and logg pair.
     #
     for i in range(len(mgravs)):
         if i == 0: # Initialize the model_list array
@@ -300,11 +290,12 @@ def split_model_njit(x, y, include_i, dmdq):
     # This function is designed specifically for model spectra; not observed data.
     #
     # H_lines: Array of wavelength regions to use when trimming specific lines from the data.
-    #    x, y: Model wavelengths and fluxes
-    #      yt: Trimmed fluxes
-    #      a2: 1D array containing the normalized and trimmed model flux
-    #      a3: 2D array containing the normalized and trimmed first partial derivatives. Has format [[dmdq1], [dmdq2]]
-    #    dmdq: Array containing first partial derivatives to the model spectra. Two fit parameters, so two first-derivatives
+    #      x, y: Model wavelengths and fluxes
+    #        yt: Trimmed fluxes
+    #        a2: 1D array containing the normalized and trimmed model flux
+    #        a3: 2D array containing the normalized and trimmed first partial derivatives. Has format [[dmdq1], [dmdq2]]
+    #      dmdq: Array containing first partial derivatives to the model spectra. Two fit parameters, so two first-derivatives
+    # include_i: indices for the Balmer lines to include (halpha=0, hbeta=1, etc). numba.njit does not support python dictionaries so I use an array here.
     #
     global njit_H_lines
 
@@ -339,7 +330,7 @@ def get_model(teff, logg, interp_2d_object):
     # Interpolate over Teff and log(g) on the observed model grid to an arbitrary teff and log(g) and return its model spectrum.
     # Obtain partial derivatives along each parameter as well.
     # If the attempted logg or teff is outside of the model grid, DO NOT extrapolate. Assign new values at 5% away from the model grid edges and continue.
-    # Extrapolation is super inaccurate and shouldn't be bothered with. I've seen a model return logg=21 even though the models stop at 9.5
+    # Extrapolation is super inaccurate and shouldn't be bothered with. I've seen a model return logg=21 even though the models stop at 9.5.
     #   dmdq = partial derivative of model m with respect to parameter q
     #        = has shape [N_parameters, N_datapoints]
     #        = first element is first partial derivitive to the entire model spectrum with respect to parameter 1
@@ -371,7 +362,7 @@ def normalize_line(x, y, i, dmdq=np.zeros((2,2)), derivative=False):
     #
     #     i: Iteration number representing which line is being fit. i=1 for halpha, i=2 for hbeta, etc
     #     n: number of points on each end of the line to average for x1, x2, y1, y2
-    #      : Average 5 points for lines below H8. For H8+, use 3
+    #      : Average 10 points for lines up to Hepsilon, otherwise use 4
     # x1,x2: average x-position of first/last n data points
     # y1,y2: average y-position of first/last n data points
     #     a: linear slope
@@ -468,16 +459,16 @@ def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift):
 
 if __name__ == "__main__":
 
-    filename = "fits_files/20170323_1012p1427_0096.ms.fits" # FITS file of the spectrum to fit
+    filename = "gsdss09_sum.fits" # FITS file of the spectrum to fit
 
     model_path = '/Users/kastra/code/python/fitspec/python_grids_ELM/' # System location of the model files.
-    convolution = 2.3 # Spectral resolution of the data.
+    convolution = 1.0 # Spectral resolution of the data.
     include = ['hgamma', 'hdelta', 'hepsilon', 'h8', 'h9', 'h10', 'h11', 'h12'] # Fit these lines
     teff0_list, logg0 = [8000., 20000.], 6.0  # Initial guesses for Teff and log(g)
-    ignore_calcium3933 = True   # Deweight the Ca II absorption at 3933 angstrom?  True/False
+    ignore_calcium3933 = False   # Deweight the Ca II absorption at 3933 angstrom?  True/False
     ignore_helium4026  = False  # Deweight the He I absorption at 4026 angstrom?   True/False
 
-    # Wavelength range for each Hydrogen line. Line centers (in air) from Rydberg formula given as element [2] of array
+    # Wavelength range for each Hydrogen line and their line centers (in air) from Rydberg formula [w1, w2, w_center]
     H_lines = {"halpha":   [6361., 6763., 6562.8821],
                "hbeta":    [4721., 5001., 4861.3791],
                "hgamma":   [4220., 4460., 4340.5092],
@@ -596,6 +587,6 @@ if __name__ == "__main__":
 
         plot_solution(xt, yt, mt, teff, eteff, logg, elogg, ax, j, shift)
 
-    # plt.suptitle(f'{filename}')
+    plt.suptitle(f'{filename}')
+    plt.savefig(f"{target}.png")
     plt.show()
-    # plt.savefig(f"{target}.png")
