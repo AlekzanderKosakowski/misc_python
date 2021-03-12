@@ -21,9 +21,11 @@ Model files used are private and are not available upon request. You'll need to 
 This means you'll also need to write your own "load_models()" function to put them in a similar format for the rest of the code to work.
 '''
 
-def load_fitsdata(filename):
+def load_data(filename):
     #
-    # Use astropy.io.fits to load spectral data from a FITS file.
+    # Load the observed data from a given data file.
+    # Accepts .txt and .csv (as 2 column format only) as text files.
+    # Accepts .fits files, but uses specific header values that may not be present in all fits files.
     # Use the header to determine wavelength values.
     # Assumes relevant data and header are located in HDU0.
     #   This may not be true.
@@ -35,24 +37,31 @@ def load_fitsdata(filename):
     #   y = np.array of observed spectral data. Split into y_lambda for F-lambda units and F-nu for F-nu units.
     #   e = np.array of observed errorbars. Errorbars not actually present in spectra. Just set all to 1 for equal weighting
     #
-    hdu = 0
-    fitsfile = fits.open(filename)
-    y_lambda = np.array(fitsfile[hdu].data, dtype=np.float64)
+    # Check if the file is a simple .txt or .csv file. If so, then use np.loadtxt() instead of astropy to load the data.
+    if ".txt" in filename or ".csv" in filename:
+        # Assume 2-column format in F-lambda units.
+        x, y_lambda = np.loadtxt(filename, unpack=True, dtype=np.float64)
+        target = filename.split(".")[0] # Target name is just the prefix of the filename
+    elif ".fits" in filename:
+        hdu = 0
+        fitsfile = fits.open(filename)
+        y_lambda = np.array(fitsfile[hdu].data, dtype=np.float64)
 
-    # x, y_nu = np.loadtxt("fnugemini0634.txt",unpack=True,dtype=np.float64)
+        # print(fitsfile.info()) ; sys.exit()
 
-    # print(fitsfile.info()) ; sys.exit()
-
-    x0 = fitsfile[hdu].header['CRVAL1'] # Based on SOAR Goodman Blue header
-    dx = fitsfile[hdu].header['CD1_1']  # Based on SOAR Goodman Blue header
-    x = np.array([x0 + k*dx for k in range(len(y_lambda))], dtype=np.float64)
+        x0 = fitsfile[hdu].header['CRVAL1'] # Based on SOAR Goodman Blue header
+        dx = fitsfile[hdu].header['CD1_1']  # Based on SOAR Goodman Blue header
+        x = np.array([x0 + k*dx for k in range(len(y_lambda))], dtype=np.float64)
+        target = fitsfile[hdu].header['OBJECT'] # Generally, the "OBJECT" header keyword is the name of the object that the telescope observer typed into the telescope software when observing
+    else:
+        print("\nFile extension not known. Try .txt, .csv, or .fits files.\nAlternatively, you could just change the code in the load_data() function to accept your file type...\n")
+        sys.exit()
 
     y_nu = flambda_to_fnu(x, y_lambda) # Convert data in F-lambda to F-nu
 
     # Weight each point equally.
     e = np.ones_like(y_nu)
 
-    target = fitsfile[hdu].header['OBJECT'] # Generally, the "OBJECT" header keyword is the name of the object that the telescope observer typed into the telescope software when observing
     # target = "0634_gemini"
     return(x, y_nu, e, target)
 
@@ -474,11 +483,11 @@ def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift, include):
 
 if __name__ == "__main__":
 
-    filename = "fits_files/a1236_temp.fits" # FITS file of the spectrum to fit
+    filename = "fnugemini0634.tbl" # FITS file of the spectrum to fit
 
     model_path = '/Users/kastra/code/python/fitspec/python_grids_ELM/' # System location of the model files.
-    convolution = 2.3 # Spectral resolution of the data.
-    include = ['hbeta', 'hgamma', 'hdelta', 'hepsilon', 'h8', 'h9', 'h10'] # Fit these lines
+    convolution = 2.6 # Spectral resolution of the data.
+    include = ['halpha', 'hbeta', 'hgamma', 'hdelta', 'hepsilon', 'h8', 'h9', 'h10'] # Fit these lines
     teff0_list, logg0 = [8000., 20000.], 6.0  # Initial guesses for Teff and log(g)
     ignore_calcium3933 = False  # De-weight the Ca II absorption at 3933 angstrom?  True/False
     ignore_helium4026  = False  # De-weight the He I absorption at 4026 angstrom?   True/False
@@ -501,7 +510,7 @@ if __name__ == "__main__":
 
 
     # Load the data and trim it to the regions around the 'include' Balmer lines. Fit and apply a wavelength shift correction from radial velocity
-    x, y, e, target = load_fitsdata(filename)
+    x, y, e, target = load_data(filename)
     xt, yt, include_i, shift = split_data(x, y, include)
 
     # Load all of the model files at once. Save an array of gravities and temperatures as well.
