@@ -4,7 +4,6 @@ font = {'family' : 'monospace',
         'weight' : 'normal',
         'size'   : 10}
 plt.rc('font', **font) # https://matplotlib.org/stable/gallery/text_labels_and_annotations/fonts_demo.html
-# plt.rc('text', usetex=True) # Allow greek symbols to show up on plots (Hbeta, etc)
 from astropy.io import fits
 from scipy.interpolate import interp1d, interp2d
 from scipy.optimize import curve_fit
@@ -39,7 +38,6 @@ def load_data(filename):
     #
     # Check if the file is a simple .txt or .csv file. If so, then use np.loadtxt() instead of astropy to load the data.
     if ".txt" in filename or ".csv" in filename:
-        # Assume 2-column format in F-lambda units.
         x, y_lambda = np.loadtxt(filename, unpack=True, dtype=np.float64)
         target = filename.split(".")[0] # Target name is just the prefix of the filename
     elif ".fits" in filename:
@@ -457,37 +455,40 @@ def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift, include):
 
     vshift = 0.5 # Vertical shift to apply to separate each Balmer line.
     offset = 0
-    count = 0
+    pcount = 0 # Count of number of lines currently plotted.
+    icount = 0 # Which line is being plotted (0 = halpha, 1 = hbeta)
     for k,v in H_lines.items():
         index = np.ravel(np.where( (x>=v[0]) & (x<=v[1]) ))
         if len(index) == 0:
             offset += vshift
+            icount += 1
             continue
-        if count == 0:
+        if pcount == 0:
             offset = 0
         ax[j].plot(x[index]-(v[2]+shift), y[index]+offset, color='black', linewidth=1)
         ax[j].plot(x[index]-(v[2]+shift), m[index]+offset, color=colors[j], linewidth=1)
         offset += vshift
         if k in include:
-            if count == 0:
+            if pcount == 0:
                 x_annotation_offset = v[0] - v[2] - 5.0 # Place line-label annotations 5 angstrom to the left of the widest line being plotted.
-            y_annotation_offset = vshift + offset + 0.09 # Place line-label annotations 0.09 relative flux above each line's normalized continuum
-            ax[j].annotate(k, xy=(x_annotation_offset, y_annotation_offset))
-        count += 1
+            y_annotation_offset = vshift + offset + 0.01*len(include) # Place line-label annotations 0.01 relative flux above each line's normalized continuum for each line that's being plotted.
+            labels = [r'H$\alpha$', r'H$\beta$', r'H$\gamma$', r'H$\delta$', r'H$\epsilon$', r'H$8$', r'H$9$', r'H$10$', r'H$11$',r'H$12$']
+            ax[j].annotate(labels[icount], xy=(x_annotation_offset, y_annotation_offset))
+        pcount += 1 ; icount += 1
 
 
-    ax[j].set_xlabel("$\Delta\lambda$ ($\AA$)")
-    # ax[j].set_xticks([-100, -50, 0, 50, 100])
+    ax[j].set_xlabel(r"$\Delta\lambda$ ($\AA$)")
+    ax[j].set_xticks([-100, -50, 0, 50, 100])
     title = f'{"Teff":>6s} = {teff:>5.0f} +/- {eteff:>5.0f}\n{"log(g)":>6s} = {logg:>5.3f} +/- {elogg:>5.3f}'
     ax[j].set_title(title,loc='left')
 
 if __name__ == "__main__":
 
-    filename = "fnugemini0634.tbl" # FITS file of the spectrum to fit
+    filename = "fnugemini0634.txt" # FITS file of the spectrum to fit
 
     model_path = '/Users/kastra/code/python/fitspec/python_grids_ELM/' # System location of the model files.
     convolution = 2.6 # Spectral resolution of the data.
-    include = ['halpha', 'hbeta', 'hgamma', 'hdelta', 'hepsilon', 'h8', 'h9', 'h10'] # Fit these lines
+    include = ['halpha', 'hbeta', 'hgamma', 'hdelta', 'hepsilon', 'h9', 'h10'] # Fit these lines
     teff0_list, logg0 = [8000., 20000.], 6.0  # Initial guesses for Teff and log(g)
     ignore_calcium3933 = False  # De-weight the Ca II absorption at 3933 angstrom?  True/False
     ignore_helium4026  = False  # De-weight the He I absorption at 4026 angstrom?   True/False
