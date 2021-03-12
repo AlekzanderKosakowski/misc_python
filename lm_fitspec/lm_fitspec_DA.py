@@ -4,6 +4,7 @@ font = {'family' : 'monospace',
         'weight' : 'normal',
         'size'   : 10}
 plt.rc('font', **font) # https://matplotlib.org/stable/gallery/text_labels_and_annotations/fonts_demo.html
+# plt.rc('text', usetex=True) # Allow greek symbols to show up on plots (Hbeta, etc)
 from astropy.io import fits
 from scipy.interpolate import interp1d, interp2d
 from scipy.optimize import curve_fit
@@ -38,6 +39,8 @@ def load_fitsdata(filename):
     fitsfile = fits.open(filename)
     y_lambda = np.array(fitsfile[hdu].data, dtype=np.float64)
 
+    # x, y_nu = np.loadtxt("fnugemini0634.txt",unpack=True,dtype=np.float64)
+
     # print(fitsfile.info()) ; sys.exit()
 
     x0 = fitsfile[hdu].header['CRVAL1'] # Based on SOAR Goodman Blue header
@@ -50,7 +53,7 @@ def load_fitsdata(filename):
     e = np.ones_like(y_nu)
 
     target = fitsfile[hdu].header['OBJECT'] # Generally, the "OBJECT" header keyword is the name of the object that the telescope observer typed into the telescope software when observing
-
+    # target = "0634_gemini"
     return(x, y_nu, e, target)
 
 def flambda_to_fnu(x, y_lambda):
@@ -371,9 +374,9 @@ def normalize_line(x, y, i, dmdq=np.zeros((2,2)), derivative=False):
     #    db: derivative of y-intercept with respect to fitted parameter
     # dmdq2: Normalized derivative of the flux (calc1 chain-rule on "normalized = flux/line_fit" for equation used)
     #
-    n = 10 if i <= 4 else 4
-    x1, x2 = np.mean(x[:n]), np.mean(x[-n:])
-    y1, y2 = np.mean(y[:n]), np.mean(y[-n:])
+    n = 8 if i <= 4 else 5
+    x1, x2 = np.median(x[:n]), np.median(x[-n:])
+    y1, y2 = np.median(y[:n]), np.median(y[-n:])
 
     a = (y2 - y1) / (x2 - x1)
     b = y1 - a*x1
@@ -432,7 +435,7 @@ def get_rms(y, m):
 
     return(e)
 
-def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift):
+def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift, include):
     #
     # Create the final plot of stacked Balmer lines and their fits
     # To center each line, the code subtracts the air-wavelength line center for each line calculated from the Rydberg equation.
@@ -443,39 +446,51 @@ def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift):
 
     colors = ['crimson', 'crimson']
 
-    vshift = 0
+    vshift = 0.5 # Vertical shift to apply to separate each Balmer line.
+    offset = 0
+    count = 0
     for k,v in H_lines.items():
         index = np.ravel(np.where( (x>=v[0]) & (x<=v[1]) ))
         if len(index) == 0:
+            offset += vshift
             continue
-        ax[j].plot(x[index]-(v[2]+shift), y[index]+vshift, color='black', linewidth=1)
-        ax[j].plot(x[index]-(v[2]+shift), m[index]+vshift, color=colors[j], linewidth=1)
-        vshift += 0.5
+        if count == 0:
+            offset = 0
+        ax[j].plot(x[index]-(v[2]+shift), y[index]+offset, color='black', linewidth=1)
+        ax[j].plot(x[index]-(v[2]+shift), m[index]+offset, color=colors[j], linewidth=1)
+        offset += vshift
+        if k in include:
+            if count == 0:
+                x_annotation_offset = v[0] - v[2] - 5.0 # Place line-label annotations 5 angstrom to the left of the widest line being plotted.
+            y_annotation_offset = vshift + offset + 0.09 # Place line-label annotations 0.09 relative flux above each line's normalized continuum
+            ax[j].annotate(k, xy=(x_annotation_offset, y_annotation_offset))
+        count += 1
+
 
     ax[j].set_xlabel("$\Delta\lambda$ ($\AA$)")
-    ax[j].set_xticks([-100, -50, 0, 50, 100])
+    # ax[j].set_xticks([-100, -50, 0, 50, 100])
     title = f'{"Teff":>6s} = {teff:>5.0f} +/- {eteff:>5.0f}\n{"log(g)":>6s} = {logg:>5.3f} +/- {elogg:>5.3f}'
     ax[j].set_title(title,loc='left')
 
 if __name__ == "__main__":
 
-    filename = "gsdss09_sum.fits" # FITS file of the spectrum to fit
+    filename = "fits_files/a1236_temp.fits" # FITS file of the spectrum to fit
 
     model_path = '/Users/kastra/code/python/fitspec/python_grids_ELM/' # System location of the model files.
-    convolution = 1.0 # Spectral resolution of the data.
-    include = ['hgamma', 'hdelta', 'hepsilon', 'h8', 'h9', 'h10', 'h11', 'h12'] # Fit these lines
+    convolution = 2.3 # Spectral resolution of the data.
+    include = ['hbeta', 'hgamma', 'hdelta', 'hepsilon', 'h8', 'h9', 'h10'] # Fit these lines
     teff0_list, logg0 = [8000., 20000.], 6.0  # Initial guesses for Teff and log(g)
-    ignore_calcium3933 = False   # Deweight the Ca II absorption at 3933 angstrom?  True/False
-    ignore_helium4026  = False  # Deweight the He I absorption at 4026 angstrom?   True/False
+    ignore_calcium3933 = False  # De-weight the Ca II absorption at 3933 angstrom?  True/False
+    ignore_helium4026  = False  # De-weight the He I absorption at 4026 angstrom?   True/False
 
     # Wavelength range for each Hydrogen line and their line centers (in air) from Rydberg formula [w1, w2, w_center]
-    H_lines = {"halpha":   [6361., 6763., 6562.8821],
+    H_lines = {"halpha":   [6411., 6713., 6562.8821],
                "hbeta":    [4721., 5001., 4861.3791],
                "hgamma":   [4220., 4460., 4340.5092],
                "hdelta":   [4031., 4171., 4101.7768],
                "hepsilon": [3925., 4015., 3970.1121],
                "h8":       [3859., 3919., 3889.0876],
-               "h9":       [3815., 3855., 3835.4220],
+               "h9":       [3813., 3857., 3835.4220],  # + 2 A on each side
                "h10":      [3782., 3812., 3797.9350],
                "h11":      [3760., 3780., 3770.6671],
                "h12":      [3741., 3759., 3750.1883]}
@@ -564,7 +579,7 @@ if __name__ == "__main__":
             elif chi2 > old_chi2:
                 alambda *= 2
                 bcount += 1
-                if bcount > 100:
+                if bcount > 25:
                     # If bad count > N fits in a row, then assume converged because you're clearly not finding a better solution anytime soon.
                     print(f"Failed to find a better solution after {bcount} attempts. Assuming converged.")
                     converged = True ; alambda = 0
@@ -585,7 +600,8 @@ if __name__ == "__main__":
         eteff, elogg = covar[0][0]**0.5, covar[1][1]**0.5
         print(f'\nFinal Solution:\n{"Teff":>6s} = {teff:>5.0f} +/- {eteff:>5.0f}\n{"log(g)":>6s} = {logg:>5.3f} +/- {elogg:>5.3f}\n{"chi2":>6s} = {chi2:>5.3f}\n')
 
-        plot_solution(xt, yt, mt, teff, eteff, logg, elogg, ax, j, shift)
+        plot_solution(xt, yt, mt, teff, eteff, logg, elogg, ax, j, shift, include)
+
 
     plt.suptitle(f'{filename}')
     plt.savefig(f"{target}.png")
