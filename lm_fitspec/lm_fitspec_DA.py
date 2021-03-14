@@ -11,13 +11,24 @@ import os
 import sys
 from numba import njit
 
-
 '''
 Personal code used to perform Levenberg-Marquardt minimization to DA white dwarf spectra from FITS files.
 This code was inspired by a similar private Fortran code.
 
 Model files used are private and are not available upon request. You'll need to create or find your own public models to use.
 This means you'll also need to write your own "load_models()" function to put them in a similar format for the rest of the code to work.
+
+To do:
+Each fitted line gets its own wavelength shift.
+    Noisy, higher-order lines use the average shift of the other lines.
+
+Adjust line normalization algorithm. Current version isn't great and occasionally leaves a trend across a line, runing the fit.
+
+Adjust vertical shift in final plot based on how noisy the spectrum is.
+    More noisy = largest vertical shift to prevent lines from overlapping.
+
+Add a convolution line to create new model files when the requested convolution isn't available.
+    Should just be a new Gaussian function and np.convolve()
 '''
 
 def load_data(filename):
@@ -43,7 +54,11 @@ def load_data(filename):
     elif ".fits" in filename:
         hdu = 0
         fitsfile = fits.open(filename)
-        y_lambda = np.array(fitsfile[hdu].data, dtype=np.float64)
+        fitsdata = fitsfile[hdu].data
+        if fitsdata.ndim == 1:
+            y_lambda = np.array(fitsfile[hdu].data, dtype=np.float64)
+        else:
+    	    y_lambda = np.array(fitsfile[hdu].data[0][0], dtype=np.float64)
 
         # print(fitsfile.info()) ; sys.exit()
 
@@ -332,7 +347,7 @@ def create_2dinterp_object(mteffs, mgravs, model_list):
     # Create a list containing one scipy.interpolate.interp2d() object per wavelength point.
     # The 0th element is the 2D interpolation object for the first wavelength point, etc.
     #
-    z  = [interp2d(mteff, mgravs, models[:,:,k], kind='cubic') for k in range(len(model_list[0][0]))]
+    z = [interp2d(mteff, mgravs, models[:,:,k], kind='cubic') for k in range(len(model_list[0][0]))]
     return(z)
 
 def get_model(teff, logg, interp_2d_object):
@@ -439,7 +454,6 @@ def get_rms(y, m):
     #
     rms = (np.sum((y - m)**2)/len(y))**0.5
     e = rms*np.ones_like(y)
-
     return(e)
 
 def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift, include):
@@ -471,7 +485,7 @@ def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift, include):
         if k in include:
             if pcount == 0:
                 x_annotation_offset = v[0] - v[2] - 5.0 # Place line-label annotations 5 angstrom to the left of the widest line being plotted.
-            y_annotation_offset = vshift + offset + 0.01*len(include) # Place line-label annotations 0.01 relative flux above each line's normalized continuum for each line that's being plotted.
+            y_annotation_offset = max(m[index]+offset) - vshift + 0.01*len(include) # Place line-label annotations 0.01 relative flux above each line's normalized model continuum for each line that's being plotted.
             labels = [r'H$\alpha$', r'H$\beta$', r'H$\gamma$', r'H$\delta$', r'H$\epsilon$', r'H$8$', r'H$9$', r'H$10$', r'H$11$',r'H$12$']
             ax[j].annotate(labels[icount], xy=(x_annotation_offset, y_annotation_offset))
         pcount += 1 ; icount += 1
@@ -484,26 +498,26 @@ def plot_solution(x, y, m, teff, eteff, logg, elogg, ax, j, shift, include):
 
 if __name__ == "__main__":
 
-    filename = "fnugemini0634.txt" # FITS file of the spectrum to fit
+    filename = "fnugemini0634.txt" # File containing observed spectrum data.
 
     model_path = '/Users/kastra/code/python/fitspec/python_grids_ELM/' # System location of the model files.
     convolution = 2.6 # Spectral resolution of the data.
-    include = ['halpha', 'hbeta', 'hgamma', 'hdelta', 'hepsilon', 'h9', 'h10'] # Fit these lines
+    include = ['halpha', 'hbeta', 'hgamma', 'hdelta', 'hepsilon', 'h8', 'h9', 'h10'] # Fit these lines
     teff0_list, logg0 = [8000., 20000.], 6.0  # Initial guesses for Teff and log(g)
     ignore_calcium3933 = False  # De-weight the Ca II absorption at 3933 angstrom?  True/False
     ignore_helium4026  = False  # De-weight the He I absorption at 4026 angstrom?   True/False
 
     # Wavelength range for each Hydrogen line and their line centers (in air) from Rydberg formula [w1, w2, w_center]
     H_lines = {"halpha":   [6411., 6713., 6562.8821],
-               "hbeta":    [4721., 5001., 4861.3791],
-               "hgamma":   [4220., 4460., 4340.5092],
-               "hdelta":   [4031., 4171., 4101.7768],
-               "hepsilon": [3925., 4015., 3970.1121],
-               "h8":       [3859., 3919., 3889.0876],
-               "h9":       [3813., 3857., 3835.4220],  # + 2 A on each side
-               "h10":      [3782., 3812., 3797.9350],
-               "h11":      [3760., 3780., 3770.6671],
-               "h12":      [3741., 3759., 3750.1883]}
+               "hbeta":    [4719., 5003., 4861.3791], # +2
+               "hgamma":   [4218., 4462., 4340.5092], # +2
+               "hdelta":   [4029., 4173., 4101.7768], # +2
+               "hepsilon": [3924., 4016., 3970.1121], # +1
+               "h8":       [3858., 3920., 3889.0876], # +1
+               "h9":       [3814., 3856., 3835.4220], # +1
+               "h10":      [3782., 3812., 3797.9350], # +0
+               "h11":      [3760., 3780., 3770.6671], # +0
+               "h12":      [3741., 3759., 3750.1883]} # +0
     # Create a np.array version of the H_lines dictionary since njit doesn't allow dictionaries.
     njit_H_lines = np.zeros((len(H_lines),3))
     for i,k in enumerate(H_lines):
@@ -581,7 +595,7 @@ if __name__ == "__main__":
                 teff += dteff ; logg += dlogg
                 alambda /= 2
                 if abs(chi2 - old_chi2) < 0.01:    # Convergence criterion in chi2
-                    if dlogg < 0.001 and dteff < 10: # Convergence criterion in logg and teff
+                    if dlogg < 0.001 and dteff < 10: # Convergence criteria in logg and teff
                         converged = True ; alambda = 0
                 old_chi2 = chi2
                 m = np.copy(m2) ; mt = np.copy(m2t)
@@ -598,7 +612,7 @@ if __name__ == "__main__":
                     m = np.copy(m2) ; mt = np.copy(m2t)
                     dmdq = np.copy(dmdq2) ; dmdqt = np.copy(dmdq2t)
             elif chi2 == old_chi2:
-                print(f"No change in chi-squared. Assuming converged.")
+                print(f"No change in chi-squared. Assuming converged.") # Not necessarily converged. May just be on a specific chi2 contour.
                 converged = True ; alambda = 0
 
 
