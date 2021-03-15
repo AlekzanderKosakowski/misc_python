@@ -20,15 +20,17 @@ This means you'll also need to write your own "load_models()" function to put th
 
 To do:
 Each fitted line gets its own wavelength shift.
-    Noisy, higher-order lines use the average shift of the other lines.
+    Noisy, higher-order lines use the average shift of the other, less-noisy lines.
 
-Adjust line normalization algorithm. Current version isn't great and occasionally leaves a trend across a line, runing the fit.
+Adjust line normalization algorithm. Current version isn't great and occasionally leaves a trend across a line for noisy data, potentially ruining the fit.
 
 Adjust vertical shift in final plot based on how noisy the spectrum is.
-    More noisy = largest vertical shift to prevent lines from overlapping.
+    More noisy = larger vertical shift to prevent lines from overlapping.
 
 Add a convolution line to create new model files when the requested convolution isn't available.
     Should just be a new Gaussian function and np.convolve()
+
+Fix split_model_njit() function. Accidentially broke something without noticing and now it doesn't work with njit.
 '''
 
 def load_data(filename):
@@ -103,7 +105,7 @@ def split_data(x, y, include):
     global H_lines
 
     # Create a list of indices of Balmer lines being fit, 0=halpha, 1=hbeta, 4=hepsilon, etc.
-    # Only used to allow njit with the split_models() function. Creating it here for convenience.
+    # Only used to allow njit with the split_model() function. Creating it here for convenience.
     include_i = [] ; i = 0
     for j,k in H_lines.items():
         if j in include:
@@ -620,8 +622,11 @@ if __name__ == "__main__":
         et[ignore_indices] += 1e30 # Re-ignore indices corresponding to common non-Hydrogen lines like Ca II 3933 or He I 4026
         beta  = get_beta(yt, et, mt, dmdqt)
         alpha = get_alpha(et, dmdqt,)
+
         covar = np.linalg.inv(alpha)
-        eteff, elogg = covar[0][0]**0.5, covar[1][1]**0.5
+        eteff, elogg = (2.30*covar[0][0])**0.5, (2.30*covar[1][1])**0.5  # 68.3% (1sigma) of normally-distributed data should fall within delta-chi2=2.30.
+                                                                         # The confidence interval for a fitted parameter is based on the covariance matrix (inverse-alpha) and this delta-chi2 value (2.30)
+                                                                         # This delta-chi2 value changes based on how many fitted parameters you have. See "Numerical Recipes in C++ Second Edition" chapter 15.6 for details.
         print(f'\nFinal Solution:\n{"Teff":>6s} = {teff:>5.0f} +/- {eteff:>5.0f}\n{"log(g)":>6s} = {logg:>5.3f} +/- {elogg:>5.3f}\n{"chi2":>6s} = {chi2:>5.3f}\n')
 
         plot_solution(xt, yt, mt, teff, eteff, logg, elogg, ax, j, shift, include)
