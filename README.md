@@ -18,3 +18,5 @@ lm_fitspec: Use Levenberg-Marquardt method to fit model DA white dwarf atmospher
 plot_phased.py: Plot phased-lightcuve with model over two phases. Separate panels zoomed into phase=0.5 and phase=1.0 for secondary and primary eclipses.
 
 skyplot.py: Plot the locations of astronomical objects on a mollweide projection of the sky. Allows quick multi-color plotting based on optional filter argument.
+
+update_header82.py: Add BJD_TDB mid-exposure frame timings to the McDonald Observatory 82inch FITS images based on the timestamps.csv file from the OLDMAID software.
