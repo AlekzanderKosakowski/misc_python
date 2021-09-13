@@ -30,8 +30,8 @@ atimes = atimes_start + exptime/2
 try:
   ra, dec = sys.argv[2], sys.argv[3]
 except IndexError:
-  print("Provide the target's R.A. and Dec as command line arguments when running this script.\n\npython3 update_header82.py <file_prefix> <R.A.> <Dec.>\n")
-  print("Example:   \"python3 update_header82.py 0353p4315 08:22:39.54 +30:48:57.19\"\n")
+  print("Provide the command line arguments when running this script.\n\npython3 update_header82.py <file_prefix> <R.A.> <Dec.> <Filter>\n")
+  print("Example:   \"python3 update_header82.py 0353p4315 08:22:39.54 +30:48:57.19 BG40\"\n")
   sys.exit()
 ip_peg = coord.SkyCoord(ra, dec, unit=(u.hourangle, u.deg), frame='icrs')
 barycentric_correction = atimes.light_travel_time(ip_peg)
@@ -52,10 +52,14 @@ for i,f in enumerate(files):
     print(f"Skipping {f}; BJD_TDB header value already exists: {header['BJD_TDB']}")
     #continue # Comment out this line if you want to overwrite the headers if they already exist.
 
+  header.set('object', object, "User-supplied object name")
+  header.set('ra', ra, "User-supplied R.A.")
+  header.set('dec', dec, "User-supplied Dec.")
   header.set('bjd_tdb', times_bjd_tdb[i].jd, "UTC based mid-exposure BJD_TDB") # Assign bjd_tdb to the header. Assumes the files and timings lists are in the same order, which is a safe assumption based on file names.
-  header.set('ra', ra, "User-supplied R.A.") # Assign bjd_tdb to the header. Assumes the files and timings lists are in the same order, which is a safe assumption based on file names.
-  header.set('dec', dec, "User-supplied Dec.") # Assign bjd_tdb to the header. Assumes the files and timings lists are in the same order, which is a safe assumption based on file names.
-  header.set('object', object, "User-supplied object name") # Assign bjd_tdb to the header. Assumes the files and timings lists are in the same order, which is a safe assumption based on file names.
+
+  filter = sys.argv[4]
+  header.set('Filter', filter, "User-supplied Filter")
+
 
   now    = Time.now().value
   year   = now.year
@@ -67,4 +71,3 @@ for i,f in enumerate(files):
 
   header.set('modify', f"{year}-{month:0>2d}-{day:0>2d}T{hour:0>2d}:{minute:0>2d}:{second:0>2d}", "Time of last modification.")
   file.close() # Close the fits file. This line is what saves the changes.
-
