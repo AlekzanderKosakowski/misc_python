@@ -60,6 +60,20 @@ for i,f in enumerate(files):
   filter = sys.argv[4]
   header.set('Filter', filter, "User-supplied Filter")
 
+  # Setup the readnoise and gain settings.
+  # The EM gain is surprisingly already in the header.
+  # The readnoise is published online: https://www.princetoninstruments.com/products/proem-family/pro-em
+  #   See info on "ProEM HS: 1024BX3"
+  #   Still need to determine these experimentally to be sure it hasn't changed.
+  emgain_key = "PI Camera Adc EMGain"
+  emgain = header.get("PI Camera Adc EMGain", "Unknown") # Ranges from 1-1000
+  readrate = header.get("PI Camera Adc Speed", "Unknown")
+  readnoise = {"1": 4.0, # Confirmed units MHz
+               "100": 3.5, # Assumed units kHz
+               "Unknown": "Unknown"}
+
+  header.set('gain', float(emgain), "EM Gain from header")
+  header.set('rdnoise', readnoise[readrate], "Readnoise based on readrate and documentation")
 
   now    = Time.now().value
   year   = now.year
