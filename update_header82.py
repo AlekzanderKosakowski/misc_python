@@ -28,20 +28,13 @@ atimes = atimes_start + exptime/2
 # Calculate barycentric correction for light travel times
 # https://docs.astropy.org/en/stable/time/index.html#barycentric-and-heliocentric-light-travel-time-corrections
 ra, dec, object, filter = [False for k in range(4)]
-try:
-  while not ra:
-    ra = str(input("Object RA (08:22:39.54):  "))
-  while not dec:
-    dec = str(input("Object Dec (+30:48:57.19):   "))
-  while not object:
-    object = str(input("Fits filename prefix (0822p3048):  "))
-  while not filter:
-    filter = str(input("Filter used (bg40):  "))
-  #ra, dec = sys.argv[2], sys.argv[3]
-except IndexError:
-  print("Provide the command line arguments when running this script.\n\npython3 update_header82.py <file_prefix> <R.A.> <Dec.> <Filter>\n")
-  print("Example:   \"python3 update_header82.py 0353p4315 08:22:39.54 +30:48:57.19 BG40\"\n")
-  sys.exit()
+object = str(os.getcwd().split("/")[-1])
+while not ra or not dec:
+  ra,dec = input("Object coordinates (08:22:39.54 +30:48:57.19):\n").split(" ")
+  print()
+while not filter:
+  filter = str(input("Filter used (bg40):\n"))
+  print()
 ip_peg = coord.SkyCoord(ra, dec, unit=(u.hourangle, u.deg), frame='icrs')
 barycentric_correction = atimes.light_travel_time(ip_peg)
 
