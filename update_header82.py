@@ -27,8 +27,17 @@ atimes = atimes_start + exptime/2
 
 # Calculate barycentric correction for light travel times
 # https://docs.astropy.org/en/stable/time/index.html#barycentric-and-heliocentric-light-travel-time-corrections
+ra, dec, object, filter = [False for k in range(4)]
 try:
-  ra, dec = sys.argv[2], sys.argv[3]
+  while not ra:
+    ra = str(input("Object RA (08:22:39.54):  "))
+  while not dec:
+    dec = str(input("Object Dec (+30:48:57.19):   "))
+  while not object:
+    object = str(input("Fits filename prefix (0822p3048):  "))
+  while not filter:
+    filter = str(input("Filter used (bg40):  "))
+  #ra, dec = sys.argv[2], sys.argv[3]
 except IndexError:
   print("Provide the command line arguments when running this script.\n\npython3 update_header82.py <file_prefix> <R.A.> <Dec.> <Filter>\n")
   print("Example:   \"python3 update_header82.py 0353p4315 08:22:39.54 +30:48:57.19 BG40\"\n")
@@ -39,7 +48,7 @@ barycentric_correction = atimes.light_travel_time(ip_peg)
 # Apply the barycentric correction to the barycentric dynamical time version of the times recorded by the telescope software.
 times_bjd_tdb = atimes.tdb + barycentric_correction
 
-object = sys.argv[1]
+#object = sys.argv[1]
 files = sorted([k for k in os.listdir() if object in k and k[-5:] == ".fits"]) # List of fits files to add image timings to.
 
 
@@ -57,7 +66,7 @@ for i,f in enumerate(files):
   header.set('dec', dec, "User-supplied Dec.")
   header.set('bjd_tdb', times_bjd_tdb[i].jd, "UTC based mid-exposure BJD_TDB") # Assign bjd_tdb to the header. Assumes the files and timings lists are in the same order, which is a safe assumption based on file names.
 
-  filter = sys.argv[4]
+  #filter = sys.argv[4]
   header.set('Filter', filter, "User-supplied Filter")
 
   # Setup the readnoise and gain settings.
