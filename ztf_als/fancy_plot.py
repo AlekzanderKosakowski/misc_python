@@ -18,6 +18,10 @@ def get_abs_mag(app_mag, app_mag_err, para, para_err):
   return(abs_mag, abs_mag_err)
 
 def fancy_plot(data, ra0, dec0, fgrid, peak_freq, power, amp, save_fig):
+  #
+  # Create the fancy output plots.
+  # Load the pickle file from mk_gaia3_pkl.py to save time when creating these plots.
+  #
   ra = float(ra0)
   dec = float(dec0)
   min_jd = np.min(data[0])

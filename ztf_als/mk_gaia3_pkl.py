@@ -9,7 +9,12 @@ def get_gaia_abs_mag(app_mag, app_mag_err, para, para_err):
 
 
 def base_plot(data, object_name):
-
+  #
+  # Create the base for the final output plots.
+  # Will have three empty light curve plots on the left and one big CMD plot on the right.
+  # Here we populate only the CMD plot with Gaia eDR3 data, then save the entire figure object as a pickle file.
+  # The pickle file is then read in later when we populate the three light curve plots.
+  #
     gaia = np.loadtxt("gaia3_output.txt", unpack=True)
     gaia_absg = get_gaia_abs_mag(gaia[2],gaia[3],gaia[0],gaia[1])
 

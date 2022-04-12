@@ -5,6 +5,11 @@ import os # Check if command-line input is a file
 from numba import njit
 
 def get_lc(ra1, dec1, files, save_lc):
+  #
+  # Search the ZTF parquet files for light curve data.
+  # Include only "good" data (catflags<32768)
+  # Include only objects with >30 observations.
+  #
   import pandas as pd
   hjd, mag, merr, filter, catflag = [[] for k in range(5)]
 

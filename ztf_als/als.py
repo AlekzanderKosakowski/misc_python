@@ -2,7 +2,10 @@ import numpy as np
 from astropy.timeseries import LombScargle # https://docs.astropy.org/en/stable/api/astropy.timeseries.LombScargle.html
 
 def run_als(hjd, flux, ferr, freq_grid):
-
+  #
+  # Run Astropy's Lomb Scargle on a data set.
+  # Assume evenly-spaced frequencies.
+  #
   t1 = np.min(hjd) # Earliest HJD measured. Used for phase calculation
   t2 = np.max(hjd)
   npts = max(len(hjd),2000) # Create at least 1000 model points for a well-sampled model light curve.

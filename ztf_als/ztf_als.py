@@ -12,7 +12,10 @@ import os
 
 
 def run_periodograms(coords):
-
+  #
+  # Run Astropy Lomb Scargle.
+  # Will add forced-photometry Box Least Squares later.
+  #
   ra, dec = coords
 
 #  print(ra, dec)
@@ -32,10 +35,11 @@ def run_periodograms(coords):
   minp = 3./1440. # Minimum period to search (in days)
   maxp = 684./1440. # Maximum period to search (in days)
   nfreq = 5_000_000 # Number of frequency points to search.
-  fgrid = np.linspace(1/maxp, 1/minp, nfreq) # Linearly-spaced frequency grid.
+  fgrid = np.linspace(1/maxp, 1/minp, nfreq) # Evenly-spaced frequency grid.
   power, peak_freq, peak_power, times, model, amp = run_als(mdata[0], mdata[1], mdata[2], fgrid)
 
   # Conditions for saving an output figure.
+  # The noise level changes with frequency, so we hard-code the noise level here for different frequency ranges.
   save_fig = False
   if (peak_power >= 0.75 and peak_power <= 1.0 and np.median(power) <= 0.15):
     save_fig = True
@@ -89,6 +93,8 @@ def run_periodograms(coords):
 
   pdata = get_phase(mdata.T, peak_freq)
 
+  # Save the .txt file
+  # ra_degrees, dec_degrees, ra, dec, mag, mag_err, peak_freq, peak_power, mean_power, amplitude
   with open("als_output10.txt", 'a') as ofile:
     stats = f"{ra} {dec} {':'.join(Decimal2RA(ra))} {':'.join(Decimal2Dec(dec))} {np.median(pdata[1])} {np.std(pdata[1])} {peak_freq} {peak_power} {np.mean(power)} {amp}\n"
     ofile.write(stats)
