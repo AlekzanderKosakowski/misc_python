@@ -91,6 +91,5 @@ def fancy_plot(data, ra0, dec0, fgrid, peak_freq, power, amp, save_fig):
 
 
 if __name__ == "__main__":
-  ra, dec = "15:20:05.1000", "+61:28:54.1484"
-  ra, dec = "14:36:51.4255", "+38:25:15.6094"
+  ra, dec = "08:22:39.54","+30:48:57.19"
   fancy_plot([[1,2,3],[1,1,1],[0.1,0.1,0.1]], ra, dec)
