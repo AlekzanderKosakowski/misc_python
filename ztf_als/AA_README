@@ -1,0 +1,36 @@
+To obtain and save ZTF DR10 light curves, run the "get_ztf10_lc.py" code:
+
+  python3 get_ztf10_lc.py 08:22:39.54 +30:48:57.19
+  python3 get_ztf10_lc.py 125.6647 30.8159
+  python3 get_ztf10_lc.py target_list.txt
+
+  where "target_list.txt" is a two-column file containing RA in column #1 and Dec in column #2, separated by a space.
+  The output light curve will be a 4-column .txt file containing: MHJD MAG MAG_ERR FILTER_CODE
+    FILTER_CODE: 1=g, 2=r, 3=i
+
+
+To run a Lomb Scargle periodogram on a multi-filter, median-combined, ZTF DR10 light curve, run the "ztf_als.py" code:
+
+  python3 ztf_als.py 08:22:39.54 +30:48:57.19
+  python3 ztf_als.py 125.6647 30.8159
+  python3 get_ztf10_lc.py target_list.txt
+
+  Adjust the minimum/maximum period with the minp/maxp variables in the ztf_als.py code.
+  Adjust the number of frequency points with the nfreqs variable in the ztf_als.py code.
+  Does not save light curve files by default.
+  Only saves images for objects that show "potentially real" variability based on experience.
+
+
+The output figure for Lomb Scargle uses the Gaia eDR3 CMD of objects with large parallax, "good" astrometry, and low parallax errors.
+To create a new Gaia eDR3 CMD for your output images:
+
+  1) Run the get_gaia_edr3_output.py code. Adjust line 71's "index" to match the constraints you want.
+       python3 get_gaia_edr3_output.py
+     This will create "gaia_edr3_output.txt", which contains the basic Gaia info for plotting with the next code.
+  2) Run mk_gaia3_pkl.py
+       python3 mk_gaia3_pkl.py
+     This will create a pickle file with the Gaia eDR3 CMD plot on the right with three blank lightcurve and FT plots on the left.
+     The three blank plots get populated in the "fancy_plot.py" code after the periodogram has been run.
+
+  Most of the final figure output details are assigned in the mk_gaia3_pkl.py code (things such as figsize and subplot spacing etc).
+  Since you can't plt.show() on the cluster, consider running the mk_gaia3_pkl.py code on your local machine to make changes to the plot.

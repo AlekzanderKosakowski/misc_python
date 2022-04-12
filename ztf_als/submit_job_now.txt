@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --partition=quanah
+#SBATCH --nodes=1
+#SBATCH --ntasks=32
+#SBATCH --ntasks-per-node=32
+##SBATCH --mem-per-cpu=4000M
+#SBATCH --job-name=wget_edr3_wd
+#SBATCH --output=%J_stdout.txt
+#SBATCH --error=%J_stderr.txt
+#SBATCH --time=00:20:00
+#SBATCH --mail-user=alekzander.kosakowski@ttu.edu
+#SBATCH --mail-type=ALL
+#SBATCH --chdir=/home/akosakow/code/ztf_als/
+
+python3 get_gaia3_output.py
