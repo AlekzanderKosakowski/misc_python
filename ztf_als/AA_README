@@ -13,7 +13,7 @@ To run a Lomb Scargle periodogram on a multi-filter, median-combined, ZTF DR10 l
 
   python3 ztf_als.py 08:22:39.54 +30:48:57.19
   python3 ztf_als.py 125.6647 30.8159
-  python3 get_ztf10_lc.py target_list.txt
+  python3 ztf_als.py target_list.txt
 
   Adjust the minimum/maximum period with the minp/maxp variables in the ztf_als.py code.
   Adjust the number of frequency points with the nfreqs variable in the ztf_als.py code.
