@@ -109,7 +109,7 @@ def Decimal2Dec(deg):
 
 def RA2Decimal(RA):
 
-    precision = 7
+    precision = 4
 
     if RA.find(":") and RA.count(":") == 2:
         hours   = float(RA.split(":")[0])
@@ -132,18 +132,20 @@ def Dec2Decimal(Dec):
     # Returns decimal Declination to N decimal, defined by precision
     #   variable.
 
-    precision = 7
+    precision = 4
 
     if Dec.find(":") and Dec.count(":") == 2:
+        south = True if "-" in Dec.split(":")[0] else False
         degrees    = float(Dec.split(":")[0])
         arcminutes = float(Dec.split(":")[1])
         arcseconds = float(Dec.split(":")[2])
     else:
+        south = True if "-" in Dec.split()[0] else False
         degrees    = float(Dec.split()[0])
         arcminutes = float(Dec.split()[1])
         arcseconds = float(Dec.split()[2])
 
-    if degrees < 0.0:
+    if degrees < 0.0 or south:
         N = -1.
     else:
         N = +1.

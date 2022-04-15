@@ -135,15 +135,17 @@ def Dec2Decimal(Dec):
     precision = 4
 
     if Dec.find(":") and Dec.count(":") == 2:
+        south = True if "-" in Dec.split(":")[0] else False
         degrees    = float(Dec.split(":")[0])
         arcminutes = float(Dec.split(":")[1])
         arcseconds = float(Dec.split(":")[2])
     else:
+        south = True if "-" in Dec.split()[0] else False
         degrees    = float(Dec.split()[0])
         arcminutes = float(Dec.split()[1])
         arcseconds = float(Dec.split()[2])
 
-    if degrees < 0.0:
+    if degrees < 0.0 or south:
         N = -1.
     else:
         N = +1.
