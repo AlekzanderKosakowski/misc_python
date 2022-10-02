@@ -150,6 +150,9 @@ if __name__ == "__main__":
     # Apply the airmass correction factor to the first star in a new column.
     df = apply_airmass_lc(df, n_stars, order=1)
 
+    # Convert relative magnitudes to relative flux
+    df = mag2flux(df, n_stars)
+
     # Save an output file.
     save_lightcurve(df, n_stars)
 
