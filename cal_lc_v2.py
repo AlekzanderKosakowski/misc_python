@@ -85,7 +85,7 @@ def save_lightcurve(df, n_stars):
     ofilename = "output_lc.txt"
     with open(ofilename, 'w') as ofile:
         for i in range(len(df['time'])):
-            line = f"{df['time'][i]} {df['airmass_cal_flux0'][i]} {df['cal_flux_error0']}\n"
+            line = f"{df['time'][i]} {df['airmass_cal_flux0'][i]} {df['cal_flux_error0'][i]}\n"
             ofile.write(line)
 
 
