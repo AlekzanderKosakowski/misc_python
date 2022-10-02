@@ -108,6 +108,7 @@ def plot_lightcurve(df, n_stars):
     plt.gca().invert_yaxis()
     plt.xlabel("BJD_TDB (days)")
     plt.ylabel("Flux (mag)")
+    plt.savefig("output_lc.jpg", dpi=100)
 
     plt.show()
 
@@ -119,7 +120,7 @@ if __name__ == "__main__":
     #
     #
     # Read the data into a pandas dataframe. One column per stellar flux, HJD/MJD saved to a separate column.
-    ifilename = "1920m2001_txdumpmag.txt"
+    ifilename = "txdump_mag.txt"
     df, n_stars = read_input(ifilename)
 
     # Create a weighted-mean light curve flux column using all of the calibration stars.
