@@ -104,14 +104,30 @@ def plot_lightcurve(df, n_stars):
     ax2 = ax1.secondary_xaxis('top',functions=(plot_secondary_x, plot_secondary_x_invert))
     ax2.set_xlabel('Time (hours)', fontsize='large')
 
-    plt.errorbar(df['time'],df['airmass_cal_flux0'], df['cal_flux_error0'],color='black',marker='.',linestyle='None',elinewidth=1,capsize=2,markersize=5)
-    plt.gca().invert_yaxis()
+    if False:
+        plt.errorbar(df['time'],df['airmass_cal_flux0'], df['cal_flux_error0'],color='black',marker='.',linestyle='None',elinewidth=1,capsize=2,markersize=5)
+        plt.gca().invert_yaxis()
+        plt.ylabel("Relative Magnitude")
+    else:
+        plt.errorbar(df['time'],df['tflux0'], df[f'tflux_error0'],color='black',marker='.',linestyle='None',elinewidth=1,capsize=2,markersize=5)
+        plt.ylabel("Relative Flux")
+
     plt.xlabel("BJD_TDB (days)")
-    plt.ylabel("Flux (mag)")
     plt.savefig("output_lc.jpg", dpi=100)
 
     plt.show()
 
+def mag2flux(df, n_stars):
+    #
+    # Convert relative magnitude to relative flux
+    #
+    # m1 - m2  =  -2.5*log10(F2/F1)
+    #
+    # F2/F1 = 10**(-(m1-m2)/2.5)
+    #
+    df[f'tflux0'] = 10**(-df['airmass_cal_flux0']/2.5)
+    df[f'tflux_error0'] = df['cal_flux_error0']*df['tflux0']*np.log(10)/2.5
+    return(df)
 
 
 
