@@ -24,7 +24,7 @@ def read_input(ifilename):
 
     for k in range(n_stars):
         flux = fluxes[k::n_stars].astype(np.float32)
-        df[f'flux{k}'] = flux - np.median(flux)*0
+        df[f'flux{k}'] = flux - 0*np.median(flux)
         df[f'flux_error{k}'] = errors[k::n_stars].astype(np.float32)
 
     return(df, n_stars)
@@ -85,7 +85,7 @@ def save_lightcurve(df, n_stars):
     ofilename = "output_lc.txt"
     with open(ofilename, 'w') as ofile:
         for i in range(len(df['time'])):
-            line = f"{df['time'][i]} {df['airmass_cal_flux0'][i]} {df['cal_flux_error0'][0]}\n"
+            line = f"{df['time'][i]} {df['airmass_cal_flux0'][i]} {df['cal_flux_error0']}\n"
             ofile.write(line)
 
 
@@ -127,6 +127,7 @@ def mag2flux(df, n_stars):
     #
     df[f'tflux0'] = 10**(-df['airmass_cal_flux0']/2.5)
     df[f'tflux_error0'] = df['cal_flux_error0']*df['tflux0']*np.log(10)/2.5
+
     return(df)
 
 
