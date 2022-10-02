@@ -24,7 +24,7 @@ def read_input(ifilename):
 
     for k in range(n_stars):
         flux = fluxes[k::n_stars].astype(np.float32)
-        df[f'flux{k}'] = flux - np.median(flux)
+        df[f'flux{k}'] = flux - np.median(flux)*0
         df[f'flux_error{k}'] = errors[k::n_stars].astype(np.float32)
 
     return(df, n_stars)
