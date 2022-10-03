@@ -23,9 +23,17 @@ def read_input(ifilename):
     df['time'] = unique_times.astype(np.float64)
 
     for k in range(n_stars):
-        flux = fluxes[k::n_stars].astype(np.float32)
-        df[f'flux{k}'] = flux - np.median(flux) # Scale the relative magnitudes to 0 so the np.average() doesnt break things later.
-        df[f'flux_error{k}'] = errors[k::n_stars].astype(np.float32)
+        flux_n = fluxes[k::n_stars]
+        error_n = errors[k::n_stars]
+
+        flux_n[flux_n=="INDEF"] = 9999
+        error_n[error_n=="INDEF"] = 9999
+
+        flux_n = np.array(flux_n, dtype=np.float32)
+        error_n = np.array(error_n, dtype=np.float32)
+
+        df[f'flux{k}'] = flux_n - np.median(flux_n)
+        df[f'flux_error{k}'] = error_n
 
     return(df, n_stars)
 
@@ -85,7 +93,8 @@ def save_lightcurve(df, n_stars):
     ofilename = "output_lc.txt"
     with open(ofilename, 'w') as ofile:
         for i in range(len(df['time'])):
-            line = f"{df['time'][i]} {df['airmass_cal_flux0'][i]} {df['cal_flux_error0'][i]}\n"
+#            line = f"{df['time'][i]} {df['airmass_cal_flux0'][i]} {df['cal_flux_error0'][i]}\n"
+            line = f"{df['time'][i]} {df['tflux0'][i]} {df['tflux_error0'][i]}\n"
             ofile.write(line)
 
 
@@ -111,6 +120,9 @@ def plot_lightcurve(df, n_stars):
     else:
         plt.errorbar(df['time'],df['tflux0'], df[f'tflux_error0'],color='black',marker='.',linestyle='None',elinewidth=1,capsize=2,markersize=5)
         plt.ylabel("Relative Flux")
+
+#    plt.axvline(x=2459853.8920331215,ymin=0,ymax=1,color='red',linestyle='--',linewidth=0.75)
+#    plt.axvline(x=2459854.9102433217,ymin=0,ymax=1,color='red',linestyle='--',linewidth=0.75)
 
     plt.xlabel("BJD_TDB (days)")
     plt.savefig("output_lc.jpg", dpi=100)
