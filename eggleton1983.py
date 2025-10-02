@@ -7,13 +7,11 @@ def eggleton_density(q, q_error, period, period_error=0):
 
     Estimate the mean density of a roche-filling donor star
       based on the system mass ratio and orbital period
-      using Eggleton+1983 calculations
+      using Eggleton1983 calculations
 
     Estimate on RL is good to within 1%,
       so we add 1% error in quadtrature.
     '''
-
-
     A = 0.49
     B = 0.60
     beta = B*q**(2./3) + np.log(1+q**(1./3))
