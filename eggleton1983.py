@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 
-def eggleton_density(q, q_error, period, period_error=0):
+def eggleton_density(q: float, q_error: float, period: float, period_error: float) -> (float, float):
     '''
     https://ui.adsabs.harvard.edu/abs/1983ApJ...268..368E/abstract
 
