@@ -9,8 +9,18 @@ def eggleton_density(q, q_error, period, period_error=0):
       based on the system mass ratio and orbital period
       using Eggleton1983 calculations
 
-    Estimate on RL is good to within 1%,
-      so we add 1% error in quadtrature.
+    Estimate on R_L is good to "better than 1%",
+      so we add 1% error in quadtrature to our RL_error variable.
+
+    Inputs:
+        q:            Mass ratio
+        q_error:      Error in mass ratio
+        period:       Orbital period (seconds)
+        period_error: Error in orbital period (seconds)
+
+    Returns:
+        rho:          Estimated mean density (g cm^-3)
+        rho_error:    Error in estimated mean density (g cm^-3)
     '''
     A = 0.49
     B = 0.60
