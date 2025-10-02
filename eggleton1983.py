@@ -45,4 +45,4 @@ if __name__ == "__main__":
     period_error = float(sys.argv[4])
 
     rho, rho_error = eggleton_density(q, q_error, period, period_error)
-    print(f"Mean Density = {rho:.3f} +/- {rho_error:.3f} g/cm^3")
+    print(f"Mean Density = {rho:.5f} +/- {rho_error:.5f} g/cm^3")
